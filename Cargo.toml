@@ -1,6 +1,6 @@
 [package]
 name = "rv-asm"
-version = "0.1.1"
+version = "0.2.0"
 description = "RISC-V instruction decoder and encoder. Credit to https://github.com/Noratrieb/rustv32i for the initail implementation."
 repository = "https://github.com/portal-co/rv-utils.git"
 edition = "2024"
