@@ -2,7 +2,7 @@
 name = "rv-asm"
 version = "0.1.1"
 description = "RISC-V instruction decoder and encoder. Credit to https://github.com/Noratrieb/rustv32i for the initail implementation."
-repository = ""
+repository = "https://github.com/portal-co/rv-utils.git"
 edition = "2024"
 keywords = ["risc-v", "riscv", "decoder", "instruction", "parser"]
 categories = ["parser-implementations"]
