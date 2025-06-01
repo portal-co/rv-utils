@@ -1,0 +1,19 @@
+[package]
+name = "rv-asm"
+version = "0.1.1"
+description = "RISC-V instruction decoder and encoder. Credit to https://github.com/Noratrieb/rustv32i for the initail implementation."
+repository = ""
+edition = "2024"
+keywords = ["risc-v", "riscv", "decoder", "instruction", "parser"]
+categories = ["parser-implementations"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(slow_tests)'] }
+
+[dev-dependencies]
+object = "0.36.7"
+rayon = "1.10.0"
+tempfile = "3.19.1"
