@@ -213,67 +213,207 @@ impl Display for Reg {
 }
 
 impl Csr {
-    /// Machine status register
+    /// Machine status register (mstatus, CSR address 0x300)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mstatus register is an MXLEN-bit read/write register formatted as shown in 
+    /// Figure 3 for RV32 and Figure 4 for RV64 and RV128. The mstatus register keeps track 
+    /// of and controls the hart's current operating state."
     pub const MSTATUS: Csr = Csr(0x300);
-    /// Machine ISA register
+    
+    /// Machine ISA register (misa, CSR address 0x301)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The misa CSR is a WARL read-write register reporting the ISA supported by the hart. 
+    /// This register must be readable in any implementation, but a value of zero can be 
+    /// returned to indicate the misa register has not been implemented."
     pub const MISA: Csr = Csr(0x301);
-    /// Machine exception delegation register
+    
+    /// Machine exception delegation register (medeleg, CSR address 0x302)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "By default, all traps at any privilege level are handled in machine mode, though 
+    /// a machine-mode handler can redirect traps back to the appropriate level with the 
+    /// MRET instruction. To increase performance, implementations can provide individual 
+    /// read/write bits within medeleg and mideleg to indicate that certain exceptions and 
+    /// interrupts should be processed directly by a lower privilege level."
     pub const MEDELEG: Csr = Csr(0x302);
-    /// Machine interrupt delegation register
+    
+    /// Machine interrupt delegation register (mideleg, CSR address 0x303)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mideleg register is a MXLEN-bit read/write register for delegating machine 
+    /// interrupts to a lower privilege level."
     pub const MIDELEG: Csr = Csr(0x303);
-    /// Machine interrupt-enable register
+    
+    /// Machine interrupt-enable register (mie, CSR address 0x304)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mie register is an MXLEN-bit read/write register containing interrupt enable bits."
     pub const MIE: Csr = Csr(0x304);
-    /// Machine trap-handler base address
+    
+    /// Machine trap-handler base address (mtvec, CSR address 0x305)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mtvec register is an MXLEN-bit WARL read/write register that holds trap vector 
+    /// configuration, consisting of a vector base address (BASE) and a vector mode (MODE)."
     pub const MTVEC: Csr = Csr(0x305);
-    /// Machine counter enable
+    
+    /// Machine counter enable (mcounteren, CSR address 0x306)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The counter-enable register mcounteren is a 32-bit register that controls the 
+    /// availability of the hardware performance-monitoring counters to the next-lowest 
+    /// privileged mode."
     pub const MCOUNTEREN: Csr = Csr(0x306);
     
-    /// Machine scratch register
+    /// Machine scratch register (mscratch, CSR address 0x340)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mscratch register is an MXLEN-bit read/write register dedicated for use by 
+    /// machine mode. Typically, it is used to hold a pointer to a machine-mode hart-local 
+    /// context space and swapped with a user register upon entry to an M-mode trap handler."
     pub const MSCRATCH: Csr = Csr(0x340);
-    /// Machine exception program counter
+    
+    /// Machine exception program counter (mepc, CSR address 0x341)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "mepc is an MXLEN-bit read/write register formatted as shown in Figure 14. The low 
+    /// bit of mepc (mepc[0]) is always zero. On implementations that support only IALIGN=32, 
+    /// the two low bits (mepc[1:0]) are always zero."
     pub const MEPC: Csr = Csr(0x341);
-    /// Machine trap cause
+    
+    /// Machine trap cause (mcause, CSR address 0x342)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mcause register is an MXLEN-bit read-write register. When a trap is taken into 
+    /// M-mode, mcause is written with a code indicating the event that caused the trap."
     pub const MCAUSE: Csr = Csr(0x342);
-    /// Machine bad address or instruction
+    
+    /// Machine bad address or instruction (mtval, CSR address 0x343)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mtval register is an MXLEN-bit read-write register formatted as shown in 
+    /// Figure 15. When a trap is taken into M-mode, mtval is either set to zero or written 
+    /// with exception-specific information to assist software in handling the trap."
     pub const MTVAL: Csr = Csr(0x343);
-    /// Machine interrupt pending
+    
+    /// Machine interrupt pending (mip, CSR address 0x344)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mip register is an MXLEN-bit read/write register containing information on 
+    /// pending interrupts."
     pub const MIP: Csr = Csr(0x344);
     
-    /// Supervisor status register
+    /// Supervisor status register (sstatus, CSR address 0x100)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sstatus register is an SXLEN-bit read/write register. The sstatus register 
+    /// keeps track of the processor's current operating state."
     pub const SSTATUS: Csr = Csr(0x100);
-    /// Supervisor interrupt-enable register
+    
+    /// Supervisor interrupt-enable register (sie, CSR address 0x104)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sie register is an SXLEN-bit read/write register containing interrupt enable bits."
     pub const SIE: Csr = Csr(0x104);
-    /// Supervisor trap handler base address
+    
+    /// Supervisor trap handler base address (stvec, CSR address 0x105)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The stvec register is an SXLEN-bit read/write register that holds trap vector 
+    /// configuration, consisting of a vector base address (BASE) and a vector mode (MODE)."
     pub const STVEC: Csr = Csr(0x105);
-    /// Supervisor counter enable
+    
+    /// Supervisor counter enable (scounteren, CSR address 0x106)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The counter-enable register scounteren is a 32-bit register that controls the 
+    /// availability of the hardware performance monitoring counters to user mode."
     pub const SCOUNTEREN: Csr = Csr(0x106);
     
-    /// Supervisor scratch register
+    /// Supervisor scratch register (sscratch, CSR address 0x140)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sscratch register is an SXLEN-bit read/write register, dedicated for use by 
+    /// the supervisor."
     pub const SSCRATCH: Csr = Csr(0x140);
-    /// Supervisor exception program counter
+    
+    /// Supervisor exception program counter (sepc, CSR address 0x141)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "sepc is an SXLEN-bit read/write register. The low bit of sepc (sepc[0]) is always zero."
     pub const SEPC: Csr = Csr(0x141);
-    /// Supervisor trap cause
+    
+    /// Supervisor trap cause (scause, CSR address 0x142)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The scause register is an SXLEN-bit read-write register. When a trap is taken into 
+    /// S-mode, scause is written with a code indicating the event that caused the trap."
     pub const SCAUSE: Csr = Csr(0x142);
-    /// Supervisor bad address or instruction
+    
+    /// Supervisor bad address or instruction (stval, CSR address 0x143)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The stval register is an SXLEN-bit read-write register. When a trap is taken into 
+    /// S-mode, stval is written with exception-specific information to assist software in 
+    /// handling the trap."
     pub const STVAL: Csr = Csr(0x143);
-    /// Supervisor interrupt pending
+    
+    /// Supervisor interrupt pending (sip, CSR address 0x144)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sip register is an SXLEN-bit read/write register containing information on 
+    /// pending interrupts."
     pub const SIP: Csr = Csr(0x144);
     
-    /// Supervisor address translation and protection
+    /// Supervisor address translation and protection (satp, CSR address 0x180)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The satp register is an SXLEN-bit read/write register, which controls supervisor-mode 
+    /// address translation and protection."
     pub const SATP: Csr = Csr(0x180);
     
-    /// Floating-Point Accrued Exceptions
+    /// Floating-Point Accrued Exceptions (fflags, CSR address 0x001)
+    /// 
+    /// RISC-V Unprivileged Specification Quote:
+    /// "The Accrued Exception Flags field fflags (fcsr bits 4–0) indicates the exception 
+    /// conditions that have arisen on any floating-point arithmetic instruction since the 
+    /// field was last reset by software."
     pub const FFLAGS: Csr = Csr(0x001);
-    /// Floating-Point Dynamic Rounding Mode
+    
+    /// Floating-Point Dynamic Rounding Mode (frm, CSR address 0x002)
+    /// 
+    /// RISC-V Unprivileged Specification Quote:
+    /// "The Rounding Mode field frm (fcsr bits 7–5) is used to select the rounding mode for 
+    /// floating-point arithmetic."
     pub const FRM: Csr = Csr(0x002);
-    /// Floating-Point Control and Status Register
+    
+    /// Floating-Point Control and Status Register (fcsr, CSR address 0x003)
+    /// 
+    /// RISC-V Unprivileged Specification Quote:
+    /// "The fcsr register may be read or written, and is the concatenation of the frm and 
+    /// fflags CSRs."
     pub const FCSR: Csr = Csr(0x003);
     
-    /// Cycle counter for RDCYCLE instruction
+    /// Cycle counter for RDCYCLE instruction (cycle, CSR address 0xC00)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The cycle CSR holds a count of the number of clock cycles executed by the processor 
+    /// core on which the hart is running."
     pub const CYCLE: Csr = Csr(0xC00);
-    /// Timer for RDTIME instruction
+    
+    /// Timer for RDTIME instruction (time, CSR address 0xC01)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The time CSR holds a count of the number of clock cycles executed on the real-time 
+    /// clock."
     pub const TIME: Csr = Csr(0xC01);
-    /// Instructions-retired counter for RDINSTRET instruction
+    
+    /// Instructions-retired counter for RDINSTRET instruction (instret, CSR address 0xC02)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The instret CSR holds a count of the number of instructions the hart has retired."
     pub const INSTRET: Csr = Csr(0xC02);
 }
 
@@ -1748,6 +1888,29 @@ impl InstCode {
     fn with_rm(self, data: u32) -> Self {
         self.insert(12..=14, data)
     }
+    fn fcvt_type(self) -> u32 {
+        // For FCVT instructions, rs2 field encodes the source/dest type
+        // RISC-V Specification Quote:
+        // "For floating-point to integer conversions, rs2 field encodes the source type 
+        // (00=W, 01=WU, 10=L, 11=LU for conversions from float, or the destination type 
+        // for conversions to float)."
+        self.extract(20..=24)
+    }
+    fn with_fcvt_type(self, data: u32) -> Self {
+        // Set the conversion type in rs2 field for FCVT instructions
+        self.insert(20..=24, data)
+    }
+    fn fp_fmt(self) -> u32 {
+        // Extract floating-point format field
+        // RISC-V Specification Quote:
+        // "The fmt field encodes the size of the floating-point operands. Encodings 
+        // are: S (00), D (01), reserved (10), Q (11)."
+        self.extract(25..=26)
+    }
+    fn with_fp_fmt(self, data: u32) -> Self {
+        // Set floating-point format field
+        self.insert(25..=26, data)
+    }
     fn imm_i(self) -> Imm {
         self.immediate_s(&[(20..=31, 0)])
     }
@@ -2918,7 +3081,7 @@ impl Inst {
                             0b1100000 => {
                                 let rm = RoundingMode::from_rm(code.rm())
                                     .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
-                                match code.frs2().0 {
+                                match code.fcvt_type() {
                                     0b00000 => Inst::FcvtWS {
                                         rm,
                                         dest: code.rd(),
@@ -2997,7 +3160,7 @@ impl Inst {
                             0b1101000 => {
                                 let rm = RoundingMode::from_rm(code.rm())
                                     .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
-                                match code.frs2().0 {
+                                match code.fcvt_type() {
                                     0b00000 => Inst::FcvtSW {
                                         rm,
                                         dest: code.frd(),
@@ -3216,7 +3379,7 @@ impl Inst {
                             0b1100001 => {
                                 let rm = RoundingMode::from_rm(code.rm())
                                     .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
-                                match code.frs2().0 {
+                                match code.fcvt_type() {
                                     0b00000 => Inst::FcvtWD {
                                         rm,
                                         dest: code.rd(),
@@ -3254,7 +3417,7 @@ impl Inst {
                             0b1101001 => {
                                 let rm = RoundingMode::from_rm(code.rm())
                                     .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
-                                match code.frs2().0 {
+                                match code.fcvt_type() {
                                     0b00000 => Inst::FcvtDW {
                                         rm,
                                         dest: code.frd(),
@@ -3669,7 +3832,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b00),
+                .with_fp_fmt(0b00),
             Inst::FmsubS { rm, dest, src1, src2, src3 } => code
                 .with_opcode(0b1000111)
                 .with_rm(rm.to_rm())
@@ -3677,7 +3840,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b00),
+                .with_fp_fmt(0b00),
             Inst::FnmsubS { rm, dest, src1, src2, src3 } => code
                 .with_opcode(0b1001011)
                 .with_rm(rm.to_rm())
@@ -3685,7 +3848,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b00),
+                .with_fp_fmt(0b00),
             Inst::FnmaddS { rm, dest, src1, src2, src3 } => code
                 .with_opcode(0b1001111)
                 .with_rm(rm.to_rm())
@@ -3693,7 +3856,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b00),
+                .with_fp_fmt(0b00),
             Inst::FaddS { rm, dest, src1, src2 } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b0000000)
@@ -3770,14 +3933,14 @@ impl Inst {
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(0)),
+                .with_fcvt_type(0),
             Inst::FcvtWuS { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1100000)
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(1)),
+                .with_fcvt_type(1),
             Inst::FmvXW { dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1110000)
@@ -3819,14 +3982,14 @@ impl Inst {
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(0)),
+                .with_fcvt_type(0),
             Inst::FcvtSWu { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1101000)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(1)),
+                .with_fcvt_type(1),
             Inst::FmvWX { dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1111000)
@@ -3855,7 +4018,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b01),
+                .with_fp_fmt(0b01),
             Inst::FmsubD { rm, dest, src1, src2, src3 } => code
                 .with_opcode(0b1000111)
                 .with_rm(rm.to_rm())
@@ -3863,7 +4026,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b01),
+                .with_fp_fmt(0b01),
             Inst::FnmsubD { rm, dest, src1, src2, src3 } => code
                 .with_opcode(0b1001011)
                 .with_rm(rm.to_rm())
@@ -3871,7 +4034,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b01),
+                .with_fp_fmt(0b01),
             Inst::FnmaddD { rm, dest, src1, src2, src3 } => code
                 .with_opcode(0b1001111)
                 .with_rm(rm.to_rm())
@@ -3879,7 +4042,7 @@ impl Inst {
                 .with_frs1(*src1)
                 .with_frs2(*src2)
                 .with_frs3(*src3)
-                .insert(25..=26, 0b01),
+                .with_fp_fmt(0b01),
             Inst::FaddD { rm, dest, src1, src2 } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b0000001)
@@ -3956,14 +4119,14 @@ impl Inst {
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(1)),
+                .with_fcvt_type(1),
             Inst::FcvtDS { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b0100001)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(0)),
+                .with_fcvt_type(0),
             Inst::FeqD { dest, src1, src2 } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1010001)
@@ -3998,28 +4161,28 @@ impl Inst {
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(0)),
+                .with_fcvt_type(0),
             Inst::FcvtWuD { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1100001)
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(1)),
+                .with_fcvt_type(1),
             Inst::FcvtDW { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1101001)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(0)),
+                .with_fcvt_type(0),
             Inst::FcvtDWu { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1101001)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(1)),
+                .with_fcvt_type(1),
             
             // RV64 F/D instructions
             Inst::FcvtLS { rm, dest, src } => code
@@ -4028,70 +4191,70 @@ impl Inst {
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(2)),
+                .with_fcvt_type(2),
             Inst::FcvtLuS { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1100000)
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(3)),
+                .with_fcvt_type(3),
             Inst::FcvtSL { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1101000)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(2)),
+                .with_fcvt_type(2),
             Inst::FcvtSLu { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1101000)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(3)),
+                .with_fcvt_type(3),
             Inst::FcvtLD { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1100001)
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(2)),
+                .with_fcvt_type(2),
             Inst::FcvtLuD { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1100001)
                 .with_rm(rm.to_rm())
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(3)),
+                .with_fcvt_type(3),
             Inst::FmvXD { dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1110001)
                 .with_funct3(0b000)
                 .with_rd(*dest)
                 .with_frs1(*src)
-                .with_frs2(FReg(0)),
+                .with_fcvt_type(0),
             Inst::FcvtDL { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1101001)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(2)),
+                .with_fcvt_type(2),
             Inst::FcvtDLu { rm, dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1101001)
                 .with_rm(rm.to_rm())
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(3)),
+                .with_fcvt_type(3),
             Inst::FmvDX { dest, src } => code
                 .with_opcode(0b1010011)
                 .with_funct7(0b1111001)
                 .with_funct3(0b000)
                 .with_frd(*dest)
                 .with_rs1(*src)
-                .with_frs2(FReg(0)),
+                .with_fcvt_type(0),
         };
         code.0
     }
