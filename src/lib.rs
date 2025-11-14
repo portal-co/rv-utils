@@ -40,6 +40,18 @@ pub struct Reg(pub u8);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FReg(pub u8);
 
+/// A Control and Status Register (CSR) address.
+/// 
+/// RISC-V Specification Quote (Zicsr Extension):
+/// "The SYSTEM major opcode is used to encode all privileged instructions, as well as the 
+/// ECALL and EBREAK instructions and CSR instructions. CSR instructions atomically 
+/// read-modify-write a single CSR, whose CSR specifier is encoded in the 12-bit csr field of 
+/// the instruction held in bits 31–20."
+/// 
+/// CSRs are 12-bit addresses, allowing for 4096 unique CSRs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Csr(pub u16);
+
 impl Reg {
     /// The zero register `zero` (`x0`)
     pub const ZERO: Reg = Reg(0);
@@ -197,6 +209,78 @@ impl Display for Reg {
             28..=31 => write!(f, "t{}", n - 28 + 3),
             _ => unreachable!("invalid register"),
         }
+    }
+}
+
+impl Csr {
+    /// Machine status register
+    pub const MSTATUS: Csr = Csr(0x300);
+    /// Machine ISA register
+    pub const MISA: Csr = Csr(0x301);
+    /// Machine exception delegation register
+    pub const MEDELEG: Csr = Csr(0x302);
+    /// Machine interrupt delegation register
+    pub const MIDELEG: Csr = Csr(0x303);
+    /// Machine interrupt-enable register
+    pub const MIE: Csr = Csr(0x304);
+    /// Machine trap-handler base address
+    pub const MTVEC: Csr = Csr(0x305);
+    /// Machine counter enable
+    pub const MCOUNTEREN: Csr = Csr(0x306);
+    
+    /// Machine scratch register
+    pub const MSCRATCH: Csr = Csr(0x340);
+    /// Machine exception program counter
+    pub const MEPC: Csr = Csr(0x341);
+    /// Machine trap cause
+    pub const MCAUSE: Csr = Csr(0x342);
+    /// Machine bad address or instruction
+    pub const MTVAL: Csr = Csr(0x343);
+    /// Machine interrupt pending
+    pub const MIP: Csr = Csr(0x344);
+    
+    /// Supervisor status register
+    pub const SSTATUS: Csr = Csr(0x100);
+    /// Supervisor interrupt-enable register
+    pub const SIE: Csr = Csr(0x104);
+    /// Supervisor trap handler base address
+    pub const STVEC: Csr = Csr(0x105);
+    /// Supervisor counter enable
+    pub const SCOUNTEREN: Csr = Csr(0x106);
+    
+    /// Supervisor scratch register
+    pub const SSCRATCH: Csr = Csr(0x140);
+    /// Supervisor exception program counter
+    pub const SEPC: Csr = Csr(0x141);
+    /// Supervisor trap cause
+    pub const SCAUSE: Csr = Csr(0x142);
+    /// Supervisor bad address or instruction
+    pub const STVAL: Csr = Csr(0x143);
+    /// Supervisor interrupt pending
+    pub const SIP: Csr = Csr(0x144);
+    
+    /// Supervisor address translation and protection
+    pub const SATP: Csr = Csr(0x180);
+    
+    /// Floating-Point Accrued Exceptions
+    pub const FFLAGS: Csr = Csr(0x001);
+    /// Floating-Point Dynamic Rounding Mode
+    pub const FRM: Csr = Csr(0x002);
+    /// Floating-Point Control and Status Register
+    pub const FCSR: Csr = Csr(0x003);
+    
+    /// Cycle counter for RDCYCLE instruction
+    pub const CYCLE: Csr = Csr(0xC00);
+    /// Timer for RDTIME instruction
+    pub const TIME: Csr = Csr(0xC01);
+    /// Instructions-retired counter for RDINSTRET instruction
+    pub const INSTRET: Csr = Csr(0xC02);
+}
+
+impl Display for Csr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Use hex format for CSR addresses
+        write!(f, "{:#x}", self.0)
     }
 }
 
@@ -470,7 +554,7 @@ pub enum Inst {
     /// integer registers. CSRRW reads the old value of the CSR, zero-extends the value to 
     /// XLEN bits, then writes it to integer register rd. The initial value in rs1 is written 
     /// to the CSR."
-    Csrrw { csr: u32, dest: Reg, src: Reg },
+    Csrrw { csr: Csr, dest: Reg, src: Reg },
     
     /// Atomic Read and Set Bits in CSR
     /// RISC-V Specification Quote:
@@ -479,7 +563,7 @@ pub enum Inst {
     /// value in integer register rs1 is treated as a bit mask that specifies bit positions to 
     /// be set in the CSR. Any bit that is high in rs1 will cause the corresponding bit to be 
     /// set in the CSR, if that CSR bit is writable."
-    Csrrs { csr: u32, dest: Reg, src: Reg },
+    Csrrs { csr: Csr, dest: Reg, src: Reg },
     
     /// Atomic Read and Clear Bits in CSR
     /// RISC-V Specification Quote:
@@ -488,27 +572,27 @@ pub enum Inst {
     /// value in integer register rs1 is treated as a bit mask that specifies bit positions to 
     /// be cleared in the CSR. Any bit that is high in rs1 will cause the corresponding bit to 
     /// be cleared in the CSR, if that CSR bit is writable."
-    Csrrc { csr: u32, dest: Reg, src: Reg },
+    Csrrc { csr: Csr, dest: Reg, src: Reg },
     
     /// Atomic Read/Write CSR Immediate
     /// RISC-V Specification Quote:
     /// "For both CSRRWI and CSRRSI, if rd=x0, then the instruction shall not read the CSR 
     /// and shall not cause any of the side effects that might occur on a CSR read."
-    Csrrwi { csr: u32, dest: Reg, uimm: u32 },
+    Csrrwi { csr: Csr, dest: Reg, uimm: Imm },
     
     /// Atomic Read and Set Bits in CSR Immediate
     /// RISC-V Specification Quote:
     /// "CSRRSI (Atomic Read and Set Bits in CSR, Immediate) is similar to CSRRS, but 
     /// updates the CSR using a 5-bit zero-extended immediate (zimm[4:0]) encoded in the 
     /// rs1 field instead of a value from an integer register."
-    Csrrsi { csr: u32, dest: Reg, uimm: u32 },
+    Csrrsi { csr: Csr, dest: Reg, uimm: Imm },
     
     /// Atomic Read and Clear Bits in CSR Immediate
     /// RISC-V Specification Quote:
     /// "CSRRCI (Atomic Read and Clear Bits in CSR, Immediate) is similar to CSRRC, but 
     /// updates the CSR using a 5-bit zero-extended immediate (zimm[4:0]) encoded in the 
     /// rs1 field instead of a value from an integer register."
-    Csrrci { csr: u32, dest: Reg, uimm: u32 },
+    Csrrci { csr: Csr, dest: Reg, uimm: Imm },
 
     // ------------- F extension (Single-Precision Floating-Point) -------------
     // RISC-V Specification Quote:
@@ -1145,12 +1229,12 @@ impl Display for Inst {
             } => write!(f, "amo{op}.w{order} {dest}, {src}, ({addr})",),
             
             // Zicsr instructions
-            Inst::Csrrw { csr, dest, src } => write!(f, "csrrw {dest}, {csr:#x}, {src}"),
-            Inst::Csrrs { csr, dest, src } => write!(f, "csrrs {dest}, {csr:#x}, {src}"),
-            Inst::Csrrc { csr, dest, src } => write!(f, "csrrc {dest}, {csr:#x}, {src}"),
-            Inst::Csrrwi { csr, dest, uimm } => write!(f, "csrrwi {dest}, {csr:#x}, {uimm}"),
-            Inst::Csrrsi { csr, dest, uimm } => write!(f, "csrrsi {dest}, {csr:#x}, {uimm}"),
-            Inst::Csrrci { csr, dest, uimm } => write!(f, "csrrci {dest}, {csr:#x}, {uimm}"),
+            Inst::Csrrw { csr, dest, src } => write!(f, "csrrw {dest}, {csr}, {src}"),
+            Inst::Csrrs { csr, dest, src } => write!(f, "csrrs {dest}, {csr}, {src}"),
+            Inst::Csrrc { csr, dest, src } => write!(f, "csrrc {dest}, {csr}, {src}"),
+            Inst::Csrrwi { csr, dest, uimm } => write!(f, "csrrwi {dest}, {csr}, {}", uimm.as_u32()),
+            Inst::Csrrsi { csr, dest, uimm } => write!(f, "csrrsi {dest}, {csr}, {}", uimm.as_u32()),
+            Inst::Csrrci { csr, dest, uimm } => write!(f, "csrrci {dest}, {csr}, {}", uimm.as_u32()),
             
             // F extension instructions
             Inst::Flw { offset, dest, base } => write!(f, "flw {dest}, {}({base})", offset.as_i32()),
@@ -1645,11 +1729,18 @@ impl InstCode {
     fn with_frs3(self, data: FReg) -> Self {
         self.insert(27..=31, data.0 as u32)
     }
-    fn csr(self) -> u32 {
-        self.extract(20..=31)
+    fn csr(self) -> Csr {
+        Csr(self.extract(20..=31) as u16)
     }
-    fn with_csr(self, data: u32) -> Self {
-        self.insert(20..=31, data)
+    fn with_csr(self, data: Csr) -> Self {
+        self.insert(20..=31, data.0 as u32)
+    }
+    fn zimm(self) -> Imm {
+        // 5-bit zero-extended immediate in rs1 field
+        Imm::new_u32(self.extract(15..=19))
+    }
+    fn with_zimm(self, data: Imm) -> Self {
+        self.insert(15..=19, data.as_u32())
     }
     fn rm(self) -> u32 {
         self.extract(12..=14)
@@ -2520,19 +2611,19 @@ impl Inst {
                     0b101 => Inst::Csrrwi {
                         csr: code.csr(),
                         dest: code.rd(),
-                        uimm: code.rs1().0 as u32,
+                        uimm: code.zimm(),
                     },
                     // CSRRSI
                     0b110 => Inst::Csrrsi {
                         csr: code.csr(),
                         dest: code.rd(),
-                        uimm: code.rs1().0 as u32,
+                        uimm: code.zimm(),
                     },
                     // CSRRCI
                     0b111 => Inst::Csrrci {
                         csr: code.csr(),
                         dest: code.rd(),
-                        uimm: code.rs1().0 as u32,
+                        uimm: code.zimm(),
                     },
                     _ => return Err(decode_error(code, "SYSTEM funct3")),
                 }
@@ -3544,19 +3635,19 @@ impl Inst {
                 .with_funct3(0b101)
                 .with_csr(*csr)
                 .with_rd(*dest)
-                .with_rs1(Reg(*uimm as u8)),
+                .with_zimm(*uimm),
             Inst::Csrrsi { csr, dest, uimm } => code
                 .with_opcode(0b1110011)
                 .with_funct3(0b110)
                 .with_csr(*csr)
                 .with_rd(*dest)
-                .with_rs1(Reg(*uimm as u8)),
+                .with_zimm(*uimm),
             Inst::Csrrci { csr, dest, uimm } => code
                 .with_opcode(0b1110011)
                 .with_funct3(0b111)
                 .with_csr(*csr)
                 .with_rd(*dest)
-                .with_rs1(Reg(*uimm as u8)),
+                .with_zimm(*uimm),
             
             // F extension instructions
             Inst::Flw { offset, dest, base } => code
@@ -4022,6 +4113,7 @@ mod tests {
     use rayon::iter::IntoParallelRefIterator;
     use rayon::iter::ParallelIterator;
 
+    use crate::Csr;
     use crate::Fence;
     use crate::FenceSet;
     use crate::Imm;
@@ -4299,7 +4391,7 @@ mod tests {
     fn test_zicsr_instructions() {
         // Test CSRRW
         let inst = Inst::Csrrw {
-            csr: 0x300,
+            csr: Csr::MSTATUS,
             dest: Reg::A0,
             src: Reg::A1,
         };
@@ -4309,7 +4401,7 @@ mod tests {
 
         // Test CSRRS
         let inst = Inst::Csrrs {
-            csr: 0x301,
+            csr: Csr::MISA,
             dest: Reg::A2,
             src: Reg::A3,
         };
@@ -4319,9 +4411,9 @@ mod tests {
 
         // Test CSRRWI
         let inst = Inst::Csrrwi {
-            csr: 0x302,
+            csr: Csr::MEDELEG,
             dest: Reg::A4,
-            uimm: 5,
+            uimm: Imm::new_u32(5),
         };
         let encoded = inst.encode_normal(Xlen::Rv32);
         let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
@@ -4537,7 +4629,7 @@ mod tests {
 
         // Test display for CSRRW
         let inst = Inst::Csrrw {
-            csr: 0x300,
+            csr: Csr::MSTATUS,
             dest: Reg::A0,
             src: Reg::A1,
         };
