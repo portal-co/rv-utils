@@ -30,6 +30,28 @@ impl Xlen {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Reg(pub u8);
 
+/// A decoded RISC-V floating-point register.
+/// 
+/// RISC-V Specification Quote (F Extension):
+/// "The F extension adds 32 floating-point registers, f0–f31, each 32 bits wide"
+/// 
+/// RISC-V Specification Quote (D Extension):
+/// "The D extension widens the 32 floating-point registers, f0–f31, to 64 bits"
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FReg(pub u8);
+
+/// A Control and Status Register (CSR) address.
+/// 
+/// RISC-V Specification Quote (Zicsr Extension):
+/// "The SYSTEM major opcode is used to encode all privileged instructions, as well as the 
+/// ECALL and EBREAK instructions and CSR instructions. CSR instructions atomically 
+/// read-modify-write a single CSR, whose CSR specifier is encoded in the 12-bit csr field of 
+/// the instruction held in bits 31–20."
+/// 
+/// CSRs are 12-bit addresses, allowing for 4096 unique CSRs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Csr(pub u16);
+
 impl Reg {
     /// The zero register `zero` (`x0`)
     pub const ZERO: Reg = Reg(0);
@@ -103,6 +125,73 @@ impl Reg {
     pub const T6: Reg = Reg(31);
 }
 
+impl FReg {
+    /// Temporary floating-point register `ft0` (`f0`)
+    pub const FT0: FReg = FReg(0);
+    /// Temporary floating-point register `ft1` (`f1`)
+    pub const FT1: FReg = FReg(1);
+    /// Temporary floating-point register `ft2` (`f2`)
+    pub const FT2: FReg = FReg(2);
+    /// Temporary floating-point register `ft3` (`f3`)
+    pub const FT3: FReg = FReg(3);
+    /// Temporary floating-point register `ft4` (`f4`)
+    pub const FT4: FReg = FReg(4);
+    /// Temporary floating-point register `ft5` (`f5`)
+    pub const FT5: FReg = FReg(5);
+    /// Temporary floating-point register `ft6` (`f6`)
+    pub const FT6: FReg = FReg(6);
+    /// Temporary floating-point register `ft7` (`f7`)
+    pub const FT7: FReg = FReg(7);
+    /// Saved floating-point register `fs0` (`f8`)
+    pub const FS0: FReg = FReg(8);
+    /// Saved floating-point register `fs1` (`f9`)
+    pub const FS1: FReg = FReg(9);
+    /// Argument/return value floating-point register `fa0` (`f10`)
+    pub const FA0: FReg = FReg(10);
+    /// Argument/return value floating-point register `fa1` (`f11`)
+    pub const FA1: FReg = FReg(11);
+    /// Argument floating-point register `fa2` (`f12`)
+    pub const FA2: FReg = FReg(12);
+    /// Argument floating-point register `fa3` (`f13`)
+    pub const FA3: FReg = FReg(13);
+    /// Argument floating-point register `fa4` (`f14`)
+    pub const FA4: FReg = FReg(14);
+    /// Argument floating-point register `fa5` (`f15`)
+    pub const FA5: FReg = FReg(15);
+    /// Argument floating-point register `fa6` (`f16`)
+    pub const FA6: FReg = FReg(16);
+    /// Argument floating-point register `fa7` (`f17`)
+    pub const FA7: FReg = FReg(17);
+    /// Saved floating-point register `fs2` (`f18`)
+    pub const FS2: FReg = FReg(18);
+    /// Saved floating-point register `fs3` (`f19`)
+    pub const FS3: FReg = FReg(19);
+    /// Saved floating-point register `fs4` (`f20`)
+    pub const FS4: FReg = FReg(20);
+    /// Saved floating-point register `fs5` (`f21`)
+    pub const FS5: FReg = FReg(21);
+    /// Saved floating-point register `fs6` (`f22`)
+    pub const FS6: FReg = FReg(22);
+    /// Saved floating-point register `fs7` (`f23`)
+    pub const FS7: FReg = FReg(23);
+    /// Saved floating-point register `fs8` (`f24`)
+    pub const FS8: FReg = FReg(24);
+    /// Saved floating-point register `fs9` (`f25`)
+    pub const FS9: FReg = FReg(25);
+    /// Saved floating-point register `fs10` (`f26`)
+    pub const FS10: FReg = FReg(26);
+    /// Saved floating-point register `fs11` (`f27`)
+    pub const FS11: FReg = FReg(27);
+    /// Temporary floating-point register `ft8` (`f28`)
+    pub const FT8: FReg = FReg(28);
+    /// Temporary floating-point register `ft9` (`f29`)
+    pub const FT9: FReg = FReg(29);
+    /// Temporary floating-point register `ft10` (`f30`)
+    pub const FT10: FReg = FReg(30);
+    /// Temporary floating-point register `ft11` (`f31`)
+    pub const FT11: FReg = FReg(31);
+}
+
 impl Display for Reg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let n = self.0;
@@ -119,6 +208,232 @@ impl Display for Reg {
             18..=27 => write!(f, "s{}", n - 18 + 2),
             28..=31 => write!(f, "t{}", n - 28 + 3),
             _ => unreachable!("invalid register"),
+        }
+    }
+}
+
+impl Csr {
+    /// Machine status register (mstatus, CSR address 0x300)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mstatus register is an MXLEN-bit read/write register formatted as shown in 
+    /// Figure 3 for RV32 and Figure 4 for RV64 and RV128. The mstatus register keeps track 
+    /// of and controls the hart's current operating state."
+    pub const MSTATUS: Csr = Csr(0x300);
+    
+    /// Machine ISA register (misa, CSR address 0x301)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The misa CSR is a WARL read-write register reporting the ISA supported by the hart. 
+    /// This register must be readable in any implementation, but a value of zero can be 
+    /// returned to indicate the misa register has not been implemented."
+    pub const MISA: Csr = Csr(0x301);
+    
+    /// Machine exception delegation register (medeleg, CSR address 0x302)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "By default, all traps at any privilege level are handled in machine mode, though 
+    /// a machine-mode handler can redirect traps back to the appropriate level with the 
+    /// MRET instruction. To increase performance, implementations can provide individual 
+    /// read/write bits within medeleg and mideleg to indicate that certain exceptions and 
+    /// interrupts should be processed directly by a lower privilege level."
+    pub const MEDELEG: Csr = Csr(0x302);
+    
+    /// Machine interrupt delegation register (mideleg, CSR address 0x303)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mideleg register is a MXLEN-bit read/write register for delegating machine 
+    /// interrupts to a lower privilege level."
+    pub const MIDELEG: Csr = Csr(0x303);
+    
+    /// Machine interrupt-enable register (mie, CSR address 0x304)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mie register is an MXLEN-bit read/write register containing interrupt enable bits."
+    pub const MIE: Csr = Csr(0x304);
+    
+    /// Machine trap-handler base address (mtvec, CSR address 0x305)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mtvec register is an MXLEN-bit WARL read/write register that holds trap vector 
+    /// configuration, consisting of a vector base address (BASE) and a vector mode (MODE)."
+    pub const MTVEC: Csr = Csr(0x305);
+    
+    /// Machine counter enable (mcounteren, CSR address 0x306)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The counter-enable register mcounteren is a 32-bit register that controls the 
+    /// availability of the hardware performance-monitoring counters to the next-lowest 
+    /// privileged mode."
+    pub const MCOUNTEREN: Csr = Csr(0x306);
+    
+    /// Machine scratch register (mscratch, CSR address 0x340)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mscratch register is an MXLEN-bit read/write register dedicated for use by 
+    /// machine mode. Typically, it is used to hold a pointer to a machine-mode hart-local 
+    /// context space and swapped with a user register upon entry to an M-mode trap handler."
+    pub const MSCRATCH: Csr = Csr(0x340);
+    
+    /// Machine exception program counter (mepc, CSR address 0x341)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "mepc is an MXLEN-bit read/write register formatted as shown in Figure 14. The low 
+    /// bit of mepc (mepc[0]) is always zero. On implementations that support only IALIGN=32, 
+    /// the two low bits (mepc[1:0]) are always zero."
+    pub const MEPC: Csr = Csr(0x341);
+    
+    /// Machine trap cause (mcause, CSR address 0x342)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mcause register is an MXLEN-bit read-write register. When a trap is taken into 
+    /// M-mode, mcause is written with a code indicating the event that caused the trap."
+    pub const MCAUSE: Csr = Csr(0x342);
+    
+    /// Machine bad address or instruction (mtval, CSR address 0x343)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mtval register is an MXLEN-bit read-write register formatted as shown in 
+    /// Figure 15. When a trap is taken into M-mode, mtval is either set to zero or written 
+    /// with exception-specific information to assist software in handling the trap."
+    pub const MTVAL: Csr = Csr(0x343);
+    
+    /// Machine interrupt pending (mip, CSR address 0x344)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The mip register is an MXLEN-bit read/write register containing information on 
+    /// pending interrupts."
+    pub const MIP: Csr = Csr(0x344);
+    
+    /// Supervisor status register (sstatus, CSR address 0x100)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sstatus register is an SXLEN-bit read/write register. The sstatus register 
+    /// keeps track of the processor's current operating state."
+    pub const SSTATUS: Csr = Csr(0x100);
+    
+    /// Supervisor interrupt-enable register (sie, CSR address 0x104)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sie register is an SXLEN-bit read/write register containing interrupt enable bits."
+    pub const SIE: Csr = Csr(0x104);
+    
+    /// Supervisor trap handler base address (stvec, CSR address 0x105)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The stvec register is an SXLEN-bit read/write register that holds trap vector 
+    /// configuration, consisting of a vector base address (BASE) and a vector mode (MODE)."
+    pub const STVEC: Csr = Csr(0x105);
+    
+    /// Supervisor counter enable (scounteren, CSR address 0x106)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The counter-enable register scounteren is a 32-bit register that controls the 
+    /// availability of the hardware performance monitoring counters to user mode."
+    pub const SCOUNTEREN: Csr = Csr(0x106);
+    
+    /// Supervisor scratch register (sscratch, CSR address 0x140)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sscratch register is an SXLEN-bit read/write register, dedicated for use by 
+    /// the supervisor."
+    pub const SSCRATCH: Csr = Csr(0x140);
+    
+    /// Supervisor exception program counter (sepc, CSR address 0x141)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "sepc is an SXLEN-bit read/write register. The low bit of sepc (sepc[0]) is always zero."
+    pub const SEPC: Csr = Csr(0x141);
+    
+    /// Supervisor trap cause (scause, CSR address 0x142)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The scause register is an SXLEN-bit read-write register. When a trap is taken into 
+    /// S-mode, scause is written with a code indicating the event that caused the trap."
+    pub const SCAUSE: Csr = Csr(0x142);
+    
+    /// Supervisor bad address or instruction (stval, CSR address 0x143)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The stval register is an SXLEN-bit read-write register. When a trap is taken into 
+    /// S-mode, stval is written with exception-specific information to assist software in 
+    /// handling the trap."
+    pub const STVAL: Csr = Csr(0x143);
+    
+    /// Supervisor interrupt pending (sip, CSR address 0x144)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The sip register is an SXLEN-bit read/write register containing information on 
+    /// pending interrupts."
+    pub const SIP: Csr = Csr(0x144);
+    
+    /// Supervisor address translation and protection (satp, CSR address 0x180)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The satp register is an SXLEN-bit read/write register, which controls supervisor-mode 
+    /// address translation and protection."
+    pub const SATP: Csr = Csr(0x180);
+    
+    /// Floating-Point Accrued Exceptions (fflags, CSR address 0x001)
+    /// 
+    /// RISC-V Unprivileged Specification Quote:
+    /// "The Accrued Exception Flags field fflags (fcsr bits 4–0) indicates the exception 
+    /// conditions that have arisen on any floating-point arithmetic instruction since the 
+    /// field was last reset by software."
+    pub const FFLAGS: Csr = Csr(0x001);
+    
+    /// Floating-Point Dynamic Rounding Mode (frm, CSR address 0x002)
+    /// 
+    /// RISC-V Unprivileged Specification Quote:
+    /// "The Rounding Mode field frm (fcsr bits 7–5) is used to select the rounding mode for 
+    /// floating-point arithmetic."
+    pub const FRM: Csr = Csr(0x002);
+    
+    /// Floating-Point Control and Status Register (fcsr, CSR address 0x003)
+    /// 
+    /// RISC-V Unprivileged Specification Quote:
+    /// "The fcsr register may be read or written, and is the concatenation of the frm and 
+    /// fflags CSRs."
+    pub const FCSR: Csr = Csr(0x003);
+    
+    /// Cycle counter for RDCYCLE instruction (cycle, CSR address 0xC00)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The cycle CSR holds a count of the number of clock cycles executed by the processor 
+    /// core on which the hart is running."
+    pub const CYCLE: Csr = Csr(0xC00);
+    
+    /// Timer for RDTIME instruction (time, CSR address 0xC01)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The time CSR holds a count of the number of clock cycles executed on the real-time 
+    /// clock."
+    pub const TIME: Csr = Csr(0xC01);
+    
+    /// Instructions-retired counter for RDINSTRET instruction (instret, CSR address 0xC02)
+    /// 
+    /// RISC-V Privileged Specification Quote:
+    /// "The instret CSR holds a count of the number of instructions the hart has retired."
+    pub const INSTRET: Csr = Csr(0xC02);
+}
+
+impl Display for Csr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Use hex format for CSR addresses
+        write!(f, "{:#x}", self.0)
+    }
+}
+
+impl Display for FReg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let n = self.0;
+        match n {
+            0..=7 => write!(f, "ft{}", n),
+            8..=9 => write!(f, "fs{}", n - 8),
+            10..=17 => write!(f, "fa{}", n - 10),
+            18..=27 => write!(f, "fs{}", n - 18 + 2),
+            28..=31 => write!(f, "ft{}", n - 28 + 8),
+            _ => unreachable!("invalid floating-point register"),
         }
     }
 }
@@ -159,7 +474,7 @@ impl Imm {
 
     /// Get the `u64` (RV64) value of the immediate.
     pub const fn as_u64(self) -> u64 {
-        self.0 as u64
+        self.0
     }
 
     /// Get the `i64` (RV64) value of the immediate.
@@ -367,6 +682,310 @@ pub enum Inst {
         addr: Reg,
         src: Reg,
     },
+
+    // ------------- Zicsr extension -------------
+    // RISC-V Specification Quote:
+    // "The SYSTEM major opcode is used to encode all privileged instructions, as well as the 
+    // ECALL and EBREAK instructions and CSR instructions"
+    
+    /// Atomic Read/Write CSR
+    /// RISC-V Specification Quote:
+    /// "CSRRW (Atomic Read/Write CSR) instruction atomically swaps values in the CSRs and 
+    /// integer registers. CSRRW reads the old value of the CSR, zero-extends the value to 
+    /// XLEN bits, then writes it to integer register rd. The initial value in rs1 is written 
+    /// to the CSR."
+    Csrrw { csr: Csr, dest: Reg, src: Reg },
+    
+    /// Atomic Read and Set Bits in CSR
+    /// RISC-V Specification Quote:
+    /// "CSRRS (Atomic Read and Set Bits in CSR) instruction reads the value of the CSR, 
+    /// zero-extends the value to XLEN bits, and writes it to integer register rd. The initial 
+    /// value in integer register rs1 is treated as a bit mask that specifies bit positions to 
+    /// be set in the CSR. Any bit that is high in rs1 will cause the corresponding bit to be 
+    /// set in the CSR, if that CSR bit is writable."
+    Csrrs { csr: Csr, dest: Reg, src: Reg },
+    
+    /// Atomic Read and Clear Bits in CSR
+    /// RISC-V Specification Quote:
+    /// "CSRRC (Atomic Read and Clear Bits in CSR) instruction reads the value of the CSR, 
+    /// zero-extends the value to XLEN bits, and writes it to integer register rd. The initial 
+    /// value in integer register rs1 is treated as a bit mask that specifies bit positions to 
+    /// be cleared in the CSR. Any bit that is high in rs1 will cause the corresponding bit to 
+    /// be cleared in the CSR, if that CSR bit is writable."
+    Csrrc { csr: Csr, dest: Reg, src: Reg },
+    
+    /// Atomic Read/Write CSR Immediate
+    /// RISC-V Specification Quote:
+    /// "For both CSRRWI and CSRRSI, if rd=x0, then the instruction shall not read the CSR 
+    /// and shall not cause any of the side effects that might occur on a CSR read."
+    Csrrwi { csr: Csr, dest: Reg, uimm: Imm },
+    
+    /// Atomic Read and Set Bits in CSR Immediate
+    /// RISC-V Specification Quote:
+    /// "CSRRSI (Atomic Read and Set Bits in CSR, Immediate) is similar to CSRRS, but 
+    /// updates the CSR using a 5-bit zero-extended immediate (zimm[4:0]) encoded in the 
+    /// rs1 field instead of a value from an integer register."
+    Csrrsi { csr: Csr, dest: Reg, uimm: Imm },
+    
+    /// Atomic Read and Clear Bits in CSR Immediate
+    /// RISC-V Specification Quote:
+    /// "CSRRCI (Atomic Read and Clear Bits in CSR, Immediate) is similar to CSRRC, but 
+    /// updates the CSR using a 5-bit zero-extended immediate (zimm[4:0]) encoded in the 
+    /// rs1 field instead of a value from an integer register."
+    Csrrci { csr: Csr, dest: Reg, uimm: Imm },
+
+    // ------------- F extension (Single-Precision Floating-Point) -------------
+    // RISC-V Specification Quote:
+    // "This chapter describes the standard instruction-set extension for single-precision 
+    // floating-point, which is named 'F'"
+    
+    /// Load Floating-Point Word
+    /// RISC-V Specification Quote:
+    /// "Floating-point loads and stores use the same base+offset addressing mode as the 
+    /// integer base ISA, with a base address in register rs1 and a 12-bit signed byte offset."
+    Flw { offset: Imm, dest: FReg, base: Reg },
+    
+    /// Store Floating-Point Word
+    /// RISC-V Specification Quote:
+    /// "FSW stores a single-precision value from floating-point register rs2 to memory."
+    Fsw { offset: Imm, src: FReg, base: Reg },
+    
+    /// Fused Multiply-Add Single-Precision
+    /// RISC-V Specification Quote:
+    /// "The fused multiply-add instructions must set the invalid operation exception flag 
+    /// when the multiplicands are ∞ and zero, even when the addend is a quiet NaN."
+    FmaddS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Fused Multiply-Subtract Single-Precision
+    FmsubS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Fused Negative Multiply-Subtract Single-Precision
+    FnmsubS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Fused Negative Multiply-Add Single-Precision
+    FnmaddS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Add Single-Precision
+    /// RISC-V Specification Quote:
+    /// "Floating-point arithmetic instructions with one or two source operands use the 
+    /// R-type format with the OP-FP major opcode."
+    FaddS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Subtract Single-Precision
+    FsubS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Multiply Single-Precision
+    FmulS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Divide Single-Precision
+    FdivS { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Square Root Single-Precision
+    /// RISC-V Specification Quote:
+    /// "Floating-point square root is encoded with rs2=0."
+    FsqrtS { rm: RoundingMode, dest: FReg, src: FReg },
+    
+    /// Sign-Inject Single-Precision
+    /// RISC-V Specification Quote:
+    /// "FSGNJ.S, FSGNJN.S, and FSGNJX.S produce a result that takes all bits except the 
+    /// sign bit from rs1. For FSGNJ, the result's sign bit is rs2's sign bit; for FSGNJN, 
+    /// the result's sign bit is the opposite of rs2's sign bit; and for FSGNJX, the sign bit 
+    /// is the XOR of the sign bits of rs1 and rs2."
+    FsgnjS { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Sign-Inject-Negate Single-Precision
+    FsgnjnS { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Sign-Inject-XOR Single-Precision
+    FsgnjxS { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Minimum Single-Precision
+    /// RISC-V Specification Quote:
+    /// "For FMIN.S and FMAX.S, if at least one input is a signaling NaN, or if both inputs 
+    /// are quiet NaNs, the result is the canonical NaN. If one operand is a quiet NaN and the 
+    /// other is not a NaN, the result is the non-NaN operand."
+    FminS { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Maximum Single-Precision
+    FmaxS { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Convert Single to Word
+    /// RISC-V Specification Quote:
+    /// "Floating-point-to-integer and integer-to-floating-point conversion instructions are 
+    /// encoded in the OP-FP major opcode space."
+    FcvtWS { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Convert Single to Unsigned Word
+    FcvtWuS { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Move from Floating-Point to Integer Register
+    /// RISC-V Specification Quote:
+    /// "FMV.X.W instruction moves the single-precision value in floating-point register rs1 
+    /// represented in IEEE 754-2008 encoding to the lower 32 bits of integer register rd."
+    FmvXW { dest: Reg, src: FReg },
+    
+    /// Floating-Point Equal Single-Precision
+    /// RISC-V Specification Quote:
+    /// "FEQ.S performs a quiet comparison: it only sets the invalid operation exception flag 
+    /// if either input is a signaling NaN."
+    FeqS { dest: Reg, src1: FReg, src2: FReg },
+    
+    /// Floating-Point Less Than Single-Precision
+    /// RISC-V Specification Quote:
+    /// "FLT.S and FLE.S perform what the IEEE 754-2008 standard refers to as signaling 
+    /// comparisons: that is, they set the invalid operation exception flag if either input is NaN."
+    FltS { dest: Reg, src1: FReg, src2: FReg },
+    
+    /// Floating-Point Less Than or Equal Single-Precision
+    FleS { dest: Reg, src1: FReg, src2: FReg },
+    
+    /// Floating-Point Classify Single-Precision
+    /// RISC-V Specification Quote:
+    /// "The FCLASS.S instruction examines the value in floating-point register rs1 and writes 
+    /// to integer register rd a 10-bit mask that indicates the class of the floating-point number."
+    FclassS { dest: Reg, src: FReg },
+    
+    /// Convert Word to Single
+    FcvtSW { rm: RoundingMode, dest: FReg, src: Reg },
+    
+    /// Convert Unsigned Word to Single
+    FcvtSWu { rm: RoundingMode, dest: FReg, src: Reg },
+    
+    /// Move from Integer to Floating-Point Register
+    /// RISC-V Specification Quote:
+    /// "FMV.W.X instruction moves the single-precision value encoded in IEEE 754-2008 standard 
+    /// encoding from the lower 32 bits of integer register rs1 to the floating-point register rd."
+    FmvWX { dest: FReg, src: Reg },
+
+    // ------------- D extension (Double-Precision Floating-Point) -------------
+    // RISC-V Specification Quote:
+    // "This chapter describes the standard double-precision floating-point instruction-set 
+    // extension, which is named 'D' and adds double-precision floating-point computational 
+    // instructions compliant with the IEEE 754-2008 arithmetic standard."
+    
+    /// Load Floating-Point Double
+    /// RISC-V Specification Quote:
+    /// "The FLD instruction loads a double-precision floating-point value from memory into 
+    /// floating-point register rd."
+    Fld { offset: Imm, dest: FReg, base: Reg },
+    
+    /// Store Floating-Point Double
+    /// RISC-V Specification Quote:
+    /// "The FSD instruction stores a double-precision value from the floating-point registers 
+    /// to memory."
+    Fsd { offset: Imm, src: FReg, base: Reg },
+    
+    /// Fused Multiply-Add Double-Precision
+    FmaddD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Fused Multiply-Subtract Double-Precision
+    FmsubD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Fused Negative Multiply-Subtract Double-Precision
+    FnmsubD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Fused Negative Multiply-Add Double-Precision
+    FnmaddD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg, src3: FReg },
+    
+    /// Add Double-Precision
+    FaddD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Subtract Double-Precision
+    FsubD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Multiply Double-Precision
+    FmulD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Divide Double-Precision
+    FdivD { rm: RoundingMode, dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Square Root Double-Precision
+    FsqrtD { rm: RoundingMode, dest: FReg, src: FReg },
+    
+    /// Sign-Inject Double-Precision
+    FsgnjD { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Sign-Inject-Negate Double-Precision
+    FsgnjnD { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Sign-Inject-XOR Double-Precision
+    FsgnjxD { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Minimum Double-Precision
+    FminD { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Maximum Double-Precision
+    FmaxD { dest: FReg, src1: FReg, src2: FReg },
+    
+    /// Convert Double to Single
+    /// RISC-V Specification Quote:
+    /// "The FCVT.S.D and FCVT.D.S instructions convert between single and double precision."
+    FcvtSD { rm: RoundingMode, dest: FReg, src: FReg },
+    
+    /// Convert Single to Double
+    FcvtDS { rm: RoundingMode, dest: FReg, src: FReg },
+    
+    /// Floating-Point Equal Double-Precision
+    FeqD { dest: Reg, src1: FReg, src2: FReg },
+    
+    /// Floating-Point Less Than Double-Precision
+    FltD { dest: Reg, src1: FReg, src2: FReg },
+    
+    /// Floating-Point Less Than or Equal Double-Precision
+    FleD { dest: Reg, src1: FReg, src2: FReg },
+    
+    /// Floating-Point Classify Double-Precision
+    FclassD { dest: Reg, src: FReg },
+    
+    /// Convert Double to Word
+    FcvtWD { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Convert Double to Unsigned Word
+    FcvtWuD { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Convert Word to Double
+    FcvtDW { rm: RoundingMode, dest: FReg, src: Reg },
+    
+    /// Convert Unsigned Word to Double
+    FcvtDWu { rm: RoundingMode, dest: FReg, src: Reg },
+
+    // RV64-specific F/D instructions
+    /// Convert Single to Long (**RV64 only**)
+    /// RISC-V Specification Quote:
+    /// "New floating-point-to-integer and integer-to-floating-point conversion instructions 
+    /// are provided for RV64."
+    FcvtLS { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Convert Single to Unsigned Long (**RV64 only**)
+    FcvtLuS { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Convert Long to Single (**RV64 only**)
+    FcvtSL { rm: RoundingMode, dest: FReg, src: Reg },
+    
+    /// Convert Unsigned Long to Single (**RV64 only**)
+    FcvtSLu { rm: RoundingMode, dest: FReg, src: Reg },
+    
+    /// Convert Double to Long (**RV64 only**)
+    FcvtLD { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Convert Double to Unsigned Long (**RV64 only**)
+    FcvtLuD { rm: RoundingMode, dest: Reg, src: FReg },
+    
+    /// Move Double to Integer Register (**RV64 only**)
+    /// RISC-V Specification Quote:
+    /// "FMV.X.D and FMV.D.X instructions are only valid for RV64. FMV.X.D moves the 
+    /// double-precision value in floating-point register rs1 to a representation in IEEE 
+    /// 754-2008 standard encoding in integer register rd."
+    FmvXD { dest: Reg, src: FReg },
+    
+    /// Convert Long to Double (**RV64 only**)
+    FcvtDL { rm: RoundingMode, dest: FReg, src: Reg },
+    
+    /// Convert Unsigned Long to Double (**RV64 only**)
+    FcvtDLu { rm: RoundingMode, dest: FReg, src: Reg },
+    
+    /// Move Integer Register to Double (**RV64 only**)
+    FmvDX { dest: FReg, src: Reg },
 }
 
 /// The details of a RISC-V `fence` instruction.
@@ -430,6 +1049,28 @@ pub enum AmoOp {
     Minu,
     /// Unsigned maximum
     Maxu,
+}
+
+/// Floating-point rounding mode.
+/// 
+/// RISC-V Specification Quote:
+/// "The rounding mode is encoded in the rm field of the instruction. If rm=111, the instruction
+/// uses the rounding mode specified in the dynamic rounding mode field frm of the floating-point
+/// control and status register fcsr. Otherwise, the rounding mode is as specified by the rm field."
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RoundingMode {
+    /// Round to Nearest, ties to Even (RNE)
+    RoundToNearestTiesToEven,
+    /// Round Towards Zero (RTZ)
+    RoundTowardsZero,
+    /// Round Down (towards −∞) (RDN)
+    RoundDown,
+    /// Round Up (towards +∞) (RUP)
+    RoundUp,
+    /// Round to Nearest, ties to Max Magnitude (RMM)
+    RoundToNearestTiesToMax,
+    /// Dynamic rounding mode (read from fcsr.frm)
+    Dynamic,
 }
 
 /// The error used for invalid instructions containing information about the instruction and error.
@@ -504,6 +1145,33 @@ impl AmoOrdering {
             AmoOrdering::Acquire => (true, false),
             AmoOrdering::Release => (false, true),
             AmoOrdering::SeqCst => (true, true),
+        }
+    }
+}
+
+impl RoundingMode {
+    /// Create a new [`RoundingMode`] from the 3-bit rm field.
+    pub fn from_rm(rm: u32) -> Option<Self> {
+        match rm {
+            0b000 => Some(Self::RoundToNearestTiesToEven),
+            0b001 => Some(Self::RoundTowardsZero),
+            0b010 => Some(Self::RoundDown),
+            0b011 => Some(Self::RoundUp),
+            0b100 => Some(Self::RoundToNearestTiesToMax),
+            0b111 => Some(Self::Dynamic),
+            _ => None,
+        }
+    }
+    
+    /// Convert to the 3-bit rm field.
+    pub fn to_rm(&self) -> u32 {
+        match self {
+            Self::RoundToNearestTiesToEven => 0b000,
+            Self::RoundTowardsZero => 0b001,
+            Self::RoundDown => 0b010,
+            Self::RoundUp => 0b011,
+            Self::RoundToNearestTiesToMax => 0b100,
+            Self::Dynamic => 0b111,
         }
     }
 }
@@ -699,6 +1367,298 @@ impl Display for Inst {
                 addr,
                 src,
             } => write!(f, "amo{op}.w{order} {dest}, {src}, ({addr})",),
+            
+            // Zicsr instructions
+            Inst::Csrrw { csr, dest, src } => write!(f, "csrrw {dest}, {csr}, {src}"),
+            Inst::Csrrs { csr, dest, src } => write!(f, "csrrs {dest}, {csr}, {src}"),
+            Inst::Csrrc { csr, dest, src } => write!(f, "csrrc {dest}, {csr}, {src}"),
+            Inst::Csrrwi { csr, dest, uimm } => write!(f, "csrrwi {dest}, {csr}, {}", uimm.as_u32()),
+            Inst::Csrrsi { csr, dest, uimm } => write!(f, "csrrsi {dest}, {csr}, {}", uimm.as_u32()),
+            Inst::Csrrci { csr, dest, uimm } => write!(f, "csrrci {dest}, {csr}, {}", uimm.as_u32()),
+            
+            // F extension instructions
+            Inst::Flw { offset, dest, base } => write!(f, "flw {dest}, {}({base})", offset.as_i32()),
+            Inst::Fsw { offset, src, base } => write!(f, "fsw {src}, {}({base})", offset.as_i32()),
+            Inst::FmaddS { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fmadd.s {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fmadd.s {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FmsubS { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fmsub.s {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fmsub.s {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FnmsubS { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fnmsub.s {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fnmsub.s {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FnmaddS { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fnmadd.s {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fnmadd.s {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FaddS { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fadd.s {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fadd.s {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FsubS { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fsub.s {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fsub.s {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FmulS { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fmul.s {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fmul.s {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FdivS { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fdiv.s {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fdiv.s {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FsqrtS { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fsqrt.s {dest}, {src}")
+                } else {
+                    write!(f, "fsqrt.s {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FsgnjS { dest, src1, src2 } => write!(f, "fsgnj.s {dest}, {src1}, {src2}"),
+            Inst::FsgnjnS { dest, src1, src2 } => write!(f, "fsgnjn.s {dest}, {src1}, {src2}"),
+            Inst::FsgnjxS { dest, src1, src2 } => write!(f, "fsgnjx.s {dest}, {src1}, {src2}"),
+            Inst::FminS { dest, src1, src2 } => write!(f, "fmin.s {dest}, {src1}, {src2}"),
+            Inst::FmaxS { dest, src1, src2 } => write!(f, "fmax.s {dest}, {src1}, {src2}"),
+            Inst::FcvtWS { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.w.s {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.w.s {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtWuS { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.wu.s {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.wu.s {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FmvXW { dest, src } => write!(f, "fmv.x.w {dest}, {src}"),
+            Inst::FeqS { dest, src1, src2 } => write!(f, "feq.s {dest}, {src1}, {src2}"),
+            Inst::FltS { dest, src1, src2 } => write!(f, "flt.s {dest}, {src1}, {src2}"),
+            Inst::FleS { dest, src1, src2 } => write!(f, "fle.s {dest}, {src1}, {src2}"),
+            Inst::FclassS { dest, src } => write!(f, "fclass.s {dest}, {src}"),
+            Inst::FcvtSW { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.s.w {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.s.w {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtSWu { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.s.wu {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.s.wu {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FmvWX { dest, src } => write!(f, "fmv.w.x {dest}, {src}"),
+            
+            // D extension instructions
+            Inst::Fld { offset, dest, base } => write!(f, "fld {dest}, {}({base})", offset.as_i32()),
+            Inst::Fsd { offset, src, base } => write!(f, "fsd {src}, {}({base})", offset.as_i32()),
+            Inst::FmaddD { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fmadd.d {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fmadd.d {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FmsubD { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fmsub.d {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fmsub.d {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FnmsubD { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fnmsub.d {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fnmsub.d {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FnmaddD { rm, dest, src1, src2, src3 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fnmadd.d {dest}, {src1}, {src2}, {src3}")
+                } else {
+                    write!(f, "fnmadd.d {dest}, {src1}, {src2}, {src3}, {rm}")
+                }
+            }
+            Inst::FaddD { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fadd.d {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fadd.d {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FsubD { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fsub.d {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fsub.d {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FmulD { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fmul.d {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fmul.d {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FdivD { rm, dest, src1, src2 } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fdiv.d {dest}, {src1}, {src2}")
+                } else {
+                    write!(f, "fdiv.d {dest}, {src1}, {src2}, {rm}")
+                }
+            }
+            Inst::FsqrtD { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fsqrt.d {dest}, {src}")
+                } else {
+                    write!(f, "fsqrt.d {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FsgnjD { dest, src1, src2 } => write!(f, "fsgnj.d {dest}, {src1}, {src2}"),
+            Inst::FsgnjnD { dest, src1, src2 } => write!(f, "fsgnjn.d {dest}, {src1}, {src2}"),
+            Inst::FsgnjxD { dest, src1, src2 } => write!(f, "fsgnjx.d {dest}, {src1}, {src2}"),
+            Inst::FminD { dest, src1, src2 } => write!(f, "fmin.d {dest}, {src1}, {src2}"),
+            Inst::FmaxD { dest, src1, src2 } => write!(f, "fmax.d {dest}, {src1}, {src2}"),
+            Inst::FcvtSD { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.s.d {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.s.d {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtDS { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.d.s {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.d.s {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FeqD { dest, src1, src2 } => write!(f, "feq.d {dest}, {src1}, {src2}"),
+            Inst::FltD { dest, src1, src2 } => write!(f, "flt.d {dest}, {src1}, {src2}"),
+            Inst::FleD { dest, src1, src2 } => write!(f, "fle.d {dest}, {src1}, {src2}"),
+            Inst::FclassD { dest, src } => write!(f, "fclass.d {dest}, {src}"),
+            Inst::FcvtWD { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.w.d {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.w.d {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtWuD { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.wu.d {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.wu.d {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtDW { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.d.w {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.d.w {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtDWu { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.d.wu {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.d.wu {dest}, {src}, {rm}")
+                }
+            }
+            
+            // RV64 F/D instructions
+            Inst::FcvtLS { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.l.s {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.l.s {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtLuS { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.lu.s {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.lu.s {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtSL { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.s.l {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.s.l {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtSLu { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.s.lu {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.s.lu {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtLD { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.l.d {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.l.d {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtLuD { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.lu.d {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.lu.d {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FmvXD { dest, src } => write!(f, "fmv.x.d {dest}, {src}"),
+            Inst::FcvtDL { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.d.l {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.d.l {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FcvtDLu { rm, dest, src } => {
+                if matches!(rm, RoundingMode::Dynamic) {
+                    write!(f, "fcvt.d.lu {dest}, {src}")
+                } else {
+                    write!(f, "fcvt.d.lu {dest}, {src}, {rm}")
+                }
+            }
+            Inst::FmvDX { dest, src } => write!(f, "fmv.d.x {dest}, {src}"),
         }
     }
 }
@@ -752,6 +1712,19 @@ impl Display for AmoOp {
             AmoOp::Max => write!(f, "max"),
             AmoOp::Minu => write!(f, "minu"),
             AmoOp::Maxu => write!(f, "maxu"),
+        }
+    }
+}
+
+impl Display for RoundingMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RoundingMode::RoundToNearestTiesToEven => write!(f, "rne"),
+            RoundingMode::RoundTowardsZero => write!(f, "rtz"),
+            RoundingMode::RoundDown => write!(f, "rdn"),
+            RoundingMode::RoundUp => write!(f, "rup"),
+            RoundingMode::RoundToNearestTiesToMax => write!(f, "rmm"),
+            RoundingMode::Dynamic => write!(f, "dyn"),
         }
     }
 }
@@ -871,6 +1844,72 @@ impl InstCode {
     }
     fn with_rd(self, data: Reg) -> Self {
         self.insert(7..=11, data.0 as u32)
+    }
+    fn frd(self) -> FReg {
+        FReg(self.extract(7..=11) as u8)
+    }
+    fn with_frd(self, data: FReg) -> Self {
+        self.insert(7..=11, data.0 as u32)
+    }
+    fn frs1(self) -> FReg {
+        FReg(self.extract(15..=19) as u8)
+    }
+    fn with_frs1(self, data: FReg) -> Self {
+        self.insert(15..=19, data.0 as u32)
+    }
+    fn frs2(self) -> FReg {
+        FReg(self.extract(20..=24) as u8)
+    }
+    fn with_frs2(self, data: FReg) -> Self {
+        self.insert(20..=24, data.0 as u32)
+    }
+    fn frs3(self) -> FReg {
+        FReg(self.extract(27..=31) as u8)
+    }
+    fn with_frs3(self, data: FReg) -> Self {
+        self.insert(27..=31, data.0 as u32)
+    }
+    fn csr(self) -> Csr {
+        Csr(self.extract(20..=31) as u16)
+    }
+    fn with_csr(self, data: Csr) -> Self {
+        self.insert(20..=31, data.0 as u32)
+    }
+    fn zimm(self) -> Imm {
+        // 5-bit zero-extended immediate in rs1 field
+        Imm::new_u32(self.extract(15..=19))
+    }
+    fn with_zimm(self, data: Imm) -> Self {
+        self.insert(15..=19, data.as_u32())
+    }
+    fn rm(self) -> u32 {
+        self.extract(12..=14)
+    }
+    fn with_rm(self, data: u32) -> Self {
+        self.insert(12..=14, data)
+    }
+    fn fcvt_type(self) -> u32 {
+        // For FCVT instructions, rs2 field encodes the source/dest type
+        // RISC-V Specification Quote:
+        // "For floating-point to integer conversions, rs2 field encodes the source type 
+        // (00=W, 01=WU, 10=L, 11=LU for conversions from float, or the destination type 
+        // for conversions to float)."
+        self.extract(20..=24)
+    }
+    fn with_fcvt_type(self, data: u32) -> Self {
+        // Set the conversion type in rs2 field for FCVT instructions
+        self.insert(20..=24, data)
+    }
+    fn fp_fmt(self) -> u32 {
+        // Extract floating-point format field
+        // RISC-V Specification Quote:
+        // "The fmt field encodes the size of the floating-point operands. Encodings 
+        // are: S (00), D (01), reserved (10), Q (11)."
+        self.extract(25..=26)
+    }
+    fn with_fp_fmt(self, data: u32) -> Self {
+        // Set floating-point format field
+        self.insert(25..=26, data)
     }
     fn imm_i(self) -> Imm {
         self.immediate_s(&[(20..=31, 0)])
@@ -1698,19 +2737,58 @@ impl Inst {
                 if code.0 == 0b11000000000000000001000001110011 {
                     return Err(decode_error(code, "unimp instruction"));
                 }
-                if code.rd().0 != 0 {
-                    return Err(decode_error(code, "SYSTEM rd"));
-                }
-                if code.funct3() != 0 {
-                    return Err(decode_error(code, "SYSTEM funct3"));
-                }
-                if code.rs1().0 != 0 {
-                    return Err(decode_error(code, "SYSTEM rs1"));
-                }
-                match code.imm_i().as_u32() {
-                    0b000000000000 => Inst::Ecall,
-                    0b000000000001 => Inst::Ebreak,
-                    _ => return Err(decode_error(code, "SYSTEM imm")),
+                match code.funct3() {
+                    // ECALL/EBREAK
+                    0b000 => {
+                        if code.rd().0 != 0 {
+                            return Err(decode_error(code, "SYSTEM rd"));
+                        }
+                        if code.rs1().0 != 0 {
+                            return Err(decode_error(code, "SYSTEM rs1"));
+                        }
+                        match code.imm_i().as_u32() {
+                            0b000000000000 => Inst::Ecall,
+                            0b000000000001 => Inst::Ebreak,
+                            _ => return Err(decode_error(code, "SYSTEM imm")),
+                        }
+                    }
+                    // CSRRW
+                    0b001 => Inst::Csrrw {
+                        csr: code.csr(),
+                        dest: code.rd(),
+                        src: code.rs1(),
+                    },
+                    // CSRRS
+                    0b010 => Inst::Csrrs {
+                        csr: code.csr(),
+                        dest: code.rd(),
+                        src: code.rs1(),
+                    },
+                    // CSRRC
+                    0b011 => Inst::Csrrc {
+                        csr: code.csr(),
+                        dest: code.rd(),
+                        src: code.rs1(),
+                    },
+                    // CSRRWI
+                    0b101 => Inst::Csrrwi {
+                        csr: code.csr(),
+                        dest: code.rd(),
+                        uimm: code.zimm(),
+                    },
+                    // CSRRSI
+                    0b110 => Inst::Csrrsi {
+                        csr: code.csr(),
+                        dest: code.rd(),
+                        uimm: code.zimm(),
+                    },
+                    // CSRRCI
+                    0b111 => Inst::Csrrci {
+                        csr: code.csr(),
+                        dest: code.rd(),
+                        uimm: code.zimm(),
+                    },
+                    _ => return Err(decode_error(code, "SYSTEM funct3")),
                 }
             }
             // AMO
@@ -1767,6 +2845,629 @@ impl Inst {
                             src: code.rs2(),
                         }
                     }
+                }
+            }
+            // LOAD-FP
+            0b0000111 => {
+                match code.funct3() {
+                    // FLW
+                    0b010 => Inst::Flw {
+                        offset: code.imm_i(),
+                        dest: code.frd(),
+                        base: code.rs1(),
+                    },
+                    // FLD
+                    0b011 => Inst::Fld {
+                        offset: code.imm_i(),
+                        dest: code.frd(),
+                        base: code.rs1(),
+                    },
+                    _ => return Err(decode_error(code, "LOAD-FP funct3")),
+                }
+            }
+            // STORE-FP
+            0b0100111 => {
+                match code.funct3() {
+                    // FSW
+                    0b010 => Inst::Fsw {
+                        offset: code.imm_s(),
+                        src: code.frs2(),
+                        base: code.rs1(),
+                    },
+                    // FSD
+                    0b011 => Inst::Fsd {
+                        offset: code.imm_s(),
+                        src: code.frs2(),
+                        base: code.rs1(),
+                    },
+                    _ => return Err(decode_error(code, "STORE-FP funct3")),
+                }
+            }
+            // MADD (Fused Multiply-Add)
+            0b1000011 => {
+                let rm = RoundingMode::from_rm(code.rm())
+                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                match code.extract(25..=26) {
+                    // FMADD.S
+                    0b00 => Inst::FmaddS {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    // FMADD.D
+                    0b01 => Inst::FmaddD {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    _ => return Err(decode_error(code, "MADD fmt")),
+                }
+            }
+            // MSUB (Fused Multiply-Subtract)
+            0b1000111 => {
+                let rm = RoundingMode::from_rm(code.rm())
+                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                match code.extract(25..=26) {
+                    // FMSUB.S
+                    0b00 => Inst::FmsubS {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    // FMSUB.D
+                    0b01 => Inst::FmsubD {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    _ => return Err(decode_error(code, "MSUB fmt")),
+                }
+            }
+            // NMSUB (Fused Negative Multiply-Subtract)
+            0b1001011 => {
+                let rm = RoundingMode::from_rm(code.rm())
+                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                match code.extract(25..=26) {
+                    // FNMSUB.S
+                    0b00 => Inst::FnmsubS {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    // FNMSUB.D
+                    0b01 => Inst::FnmsubD {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    _ => return Err(decode_error(code, "NMSUB fmt")),
+                }
+            }
+            // NMADD (Fused Negative Multiply-Add)
+            0b1001111 => {
+                let rm = RoundingMode::from_rm(code.rm())
+                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                match code.extract(25..=26) {
+                    // FNMADD.S
+                    0b00 => Inst::FnmaddS {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    // FNMADD.D
+                    0b01 => Inst::FnmaddD {
+                        rm,
+                        dest: code.frd(),
+                        src1: code.frs1(),
+                        src2: code.frs2(),
+                        src3: code.frs3(),
+                    },
+                    _ => return Err(decode_error(code, "NMADD fmt")),
+                }
+            }
+            // OP-FP
+            0b1010011 => {
+                let fmt = code.extract(25..=26);
+                match fmt {
+                    // Single-precision (fmt=00)
+                    0b00 => {
+                        let funct7 = code.funct7();
+                        match funct7 {
+                            // FADD.S
+                            0b0000000 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FaddS {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FSUB.S
+                            0b0000100 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FsubS {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FMUL.S
+                            0b0001000 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FmulS {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FDIV.S
+                            0b0001100 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FdivS {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FSQRT.S
+                            0b0101100 => {
+                                if code.frs2().0 != 0 {
+                                    return Err(decode_error(code, "FSQRT.S rs2 must be 0"));
+                                }
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FsqrtS {
+                                    rm,
+                                    dest: code.frd(),
+                                    src: code.frs1(),
+                                }
+                            }
+                            // FSGNJ.S, FSGNJN.S, FSGNJX.S
+                            0b0010000 => match code.funct3() {
+                                0b000 => Inst::FsgnjS {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b001 => Inst::FsgnjnS {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b010 => Inst::FsgnjxS {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                _ => return Err(decode_error(code, "FSGNJ.S funct3")),
+                            },
+                            // FMIN.S, FMAX.S
+                            0b0010100 => match code.funct3() {
+                                0b000 => Inst::FminS {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b001 => Inst::FmaxS {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                _ => return Err(decode_error(code, "FMIN/FMAX.S funct3")),
+                            },
+                            // FCVT.W.S, FCVT.WU.S, FCVT.L.S, FCVT.LU.S
+                            0b1100000 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                match code.fcvt_type() {
+                                    0b00000 => Inst::FcvtWS {
+                                        rm,
+                                        dest: code.rd(),
+                                        src: code.frs1(),
+                                    },
+                                    0b00001 => Inst::FcvtWuS {
+                                        rm,
+                                        dest: code.rd(),
+                                        src: code.frs1(),
+                                    },
+                                    0b00010 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.L.S only on RV64"));
+                                        }
+                                        Inst::FcvtLS {
+                                            rm,
+                                            dest: code.rd(),
+                                            src: code.frs1(),
+                                        }
+                                    }
+                                    0b00011 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.LU.S only on RV64"));
+                                        }
+                                        Inst::FcvtLuS {
+                                            rm,
+                                            dest: code.rd(),
+                                            src: code.frs1(),
+                                        }
+                                    }
+                                    _ => return Err(decode_error(code, "FCVT.W.S rs2")),
+                                }
+                            }
+                            // FMV.X.W, FCLASS.S
+                            0b1110000 => match code.funct3() {
+                                0b000 => {
+                                    if code.frs2().0 != 0 {
+                                        return Err(decode_error(code, "FMV.X.W rs2 must be 0"));
+                                    }
+                                    Inst::FmvXW {
+                                        dest: code.rd(),
+                                        src: code.frs1(),
+                                    }
+                                }
+                                0b001 => {
+                                    if code.frs2().0 != 0 {
+                                        return Err(decode_error(code, "FCLASS.S rs2 must be 0"));
+                                    }
+                                    Inst::FclassS {
+                                        dest: code.rd(),
+                                        src: code.frs1(),
+                                    }
+                                }
+                                _ => return Err(decode_error(code, "FMV.X.W/FCLASS.S funct3")),
+                            },
+                            // FEQ.S, FLT.S, FLE.S
+                            0b1010000 => match code.funct3() {
+                                0b010 => Inst::FeqS {
+                                    dest: code.rd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b001 => Inst::FltS {
+                                    dest: code.rd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b000 => Inst::FleS {
+                                    dest: code.rd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                _ => return Err(decode_error(code, "FEQ/FLT/FLE.S funct3")),
+                            },
+                            // FCVT.S.W, FCVT.S.WU, FCVT.S.L, FCVT.S.LU
+                            0b1101000 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                match code.fcvt_type() {
+                                    0b00000 => Inst::FcvtSW {
+                                        rm,
+                                        dest: code.frd(),
+                                        src: code.rs1(),
+                                    },
+                                    0b00001 => Inst::FcvtSWu {
+                                        rm,
+                                        dest: code.frd(),
+                                        src: code.rs1(),
+                                    },
+                                    0b00010 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.S.L only on RV64"));
+                                        }
+                                        Inst::FcvtSL {
+                                            rm,
+                                            dest: code.frd(),
+                                            src: code.rs1(),
+                                        }
+                                    }
+                                    0b00011 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.S.LU only on RV64"));
+                                        }
+                                        Inst::FcvtSLu {
+                                            rm,
+                                            dest: code.frd(),
+                                            src: code.rs1(),
+                                        }
+                                    }
+                                    _ => return Err(decode_error(code, "FCVT.S.W rs2")),
+                                }
+                            }
+                            // FMV.W.X
+                            0b1111000 => {
+                                if code.funct3() != 0b000 {
+                                    return Err(decode_error(code, "FMV.W.X funct3"));
+                                }
+                                if code.frs2().0 != 0 {
+                                    return Err(decode_error(code, "FMV.W.X rs2 must be 0"));
+                                }
+                                Inst::FmvWX {
+                                    dest: code.frd(),
+                                    src: code.rs1(),
+                                }
+                            }
+                            // FCVT.S.D (converts double to single)
+                            0b0100000 => {
+                                if code.frs2().0 != 1 {
+                                    return Err(decode_error(code, "FCVT.S.D rs2 must be 1"));
+                                }
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FcvtSD {
+                                    rm,
+                                    dest: code.frd(),
+                                    src: code.frs1(),
+                                }
+                            }
+                            _ => return Err(decode_error(code, "OP-FP.S funct7")),
+                        }
+                    }
+                    // Double-precision (fmt=01)
+                    0b01 => {
+                        let funct7 = code.funct7();
+                        match funct7 {
+                            // FADD.D
+                            0b0000001 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FaddD {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FSUB.D
+                            0b0000101 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FsubD {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FMUL.D
+                            0b0001001 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FmulD {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FDIV.D
+                            0b0001101 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FdivD {
+                                    rm,
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                }
+                            }
+                            // FSQRT.D
+                            0b0101101 => {
+                                if code.frs2().0 != 0 {
+                                    return Err(decode_error(code, "FSQRT.D rs2 must be 0"));
+                                }
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FsqrtD {
+                                    rm,
+                                    dest: code.frd(),
+                                    src: code.frs1(),
+                                }
+                            }
+                            // FSGNJ.D, FSGNJN.D, FSGNJX.D
+                            0b0010001 => match code.funct3() {
+                                0b000 => Inst::FsgnjD {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b001 => Inst::FsgnjnD {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b010 => Inst::FsgnjxD {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                _ => return Err(decode_error(code, "FSGNJ.D funct3")),
+                            },
+                            // FMIN.D, FMAX.D
+                            0b0010101 => match code.funct3() {
+                                0b000 => Inst::FminD {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b001 => Inst::FmaxD {
+                                    dest: code.frd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                _ => return Err(decode_error(code, "FMIN/FMAX.D funct3")),
+                            },
+                            // FCVT.D.S
+                            0b0100001 => {
+                                if code.frs2().0 != 0 {
+                                    return Err(decode_error(code, "FCVT.D.S rs2 must be 0"));
+                                }
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FcvtDS {
+                                    rm,
+                                    dest: code.frd(),
+                                    src: code.frs1(),
+                                }
+                            }
+                            // FEQ.D, FLT.D, FLE.D
+                            0b1010001 => match code.funct3() {
+                                0b010 => Inst::FeqD {
+                                    dest: code.rd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b001 => Inst::FltD {
+                                    dest: code.rd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                0b000 => Inst::FleD {
+                                    dest: code.rd(),
+                                    src1: code.frs1(),
+                                    src2: code.frs2(),
+                                },
+                                _ => return Err(decode_error(code, "FEQ/FLT/FLE.D funct3")),
+                            },
+                            // FCLASS.D, FMV.X.D
+                            0b1110001 => {
+                                match code.funct3() {
+                                    // FMV.X.D (only on RV64)
+                                    0b000 if xlen.is_64() => {
+                                        if code.frs2().0 != 0 {
+                                            return Err(decode_error(code, "FMV.X.D rs2 must be 0"));
+                                        }
+                                        Inst::FmvXD {
+                                            dest: code.rd(),
+                                            src: code.frs1(),
+                                        }
+                                    }
+                                    // FCLASS.D
+                                    0b001 => {
+                                        if code.frs2().0 != 0 {
+                                            return Err(decode_error(code, "FCLASS.D rs2 must be 0"));
+                                        }
+                                        Inst::FclassD {
+                                            dest: code.rd(),
+                                            src: code.frs1(),
+                                        }
+                                    }
+                                    _ => return Err(decode_error(code, "0b1110001 funct3")),
+                                }
+                            }
+                            // FCVT.W.D, FCVT.WU.D, FCVT.L.D, FCVT.LU.D
+                            0b1100001 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                match code.fcvt_type() {
+                                    0b00000 => Inst::FcvtWD {
+                                        rm,
+                                        dest: code.rd(),
+                                        src: code.frs1(),
+                                    },
+                                    0b00001 => Inst::FcvtWuD {
+                                        rm,
+                                        dest: code.rd(),
+                                        src: code.frs1(),
+                                    },
+                                    0b00010 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.L.D only on RV64"));
+                                        }
+                                        Inst::FcvtLD {
+                                            rm,
+                                            dest: code.rd(),
+                                            src: code.frs1(),
+                                        }
+                                    }
+                                    0b00011 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.LU.D only on RV64"));
+                                        }
+                                        Inst::FcvtLuD {
+                                            rm,
+                                            dest: code.rd(),
+                                            src: code.frs1(),
+                                        }
+                                    }
+                                    _ => return Err(decode_error(code, "FCVT.W.D rs2")),
+                                }
+                            }
+                            // FCVT.D.W, FCVT.D.WU, FCVT.D.L, FCVT.D.LU
+                            0b1101001 => {
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                match code.fcvt_type() {
+                                    0b00000 => Inst::FcvtDW {
+                                        rm,
+                                        dest: code.frd(),
+                                        src: code.rs1(),
+                                    },
+                                    0b00001 => Inst::FcvtDWu {
+                                        rm,
+                                        dest: code.frd(),
+                                        src: code.rs1(),
+                                    },
+                                    0b00010 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.D.L only on RV64"));
+                                        }
+                                        Inst::FcvtDL {
+                                            rm,
+                                            dest: code.frd(),
+                                            src: code.rs1(),
+                                        }
+                                    }
+                                    0b00011 => {
+                                        if xlen.is_32() {
+                                            return Err(decode_error(code, "FCVT.D.LU only on RV64"));
+                                        }
+                                        Inst::FcvtDLu {
+                                            rm,
+                                            dest: code.frd(),
+                                            src: code.rs1(),
+                                        }
+                                    }
+                                    _ => return Err(decode_error(code, "FCVT.D.W rs2")),
+                                }
+                            }
+                            // FMV.D.X
+                            0b1111001 if xlen.is_64() => {
+                                if code.funct3() != 0b000 {
+                                    return Err(decode_error(code, "FMV.D.X funct3"));
+                                }
+                                if code.frs2().0 != 0 {
+                                    return Err(decode_error(code, "FMV.D.X rs2 must be 0"));
+                                }
+                                Inst::FmvDX {
+                                    dest: code.frd(),
+                                    src: code.rs1(),
+                                }
+                            }
+                            _ => return Err(decode_error(code, "OP-FP.D funct7")),
+                        }
+                    }
+                    _ => return Err(decode_error(code, "OP-FP fmt")),
                 }
             }
             _ => return Err(decode_error(code, "opcode")),
@@ -2072,6 +3773,488 @@ impl Inst {
                     },
                 ),
             },
+            
+            // Zicsr instructions
+            Inst::Csrrw { csr, dest, src } => code
+                .with_opcode(0b1110011)
+                .with_funct3(0b001)
+                .with_csr(*csr)
+                .with_rd(*dest)
+                .with_rs1(*src),
+            Inst::Csrrs { csr, dest, src } => code
+                .with_opcode(0b1110011)
+                .with_funct3(0b010)
+                .with_csr(*csr)
+                .with_rd(*dest)
+                .with_rs1(*src),
+            Inst::Csrrc { csr, dest, src } => code
+                .with_opcode(0b1110011)
+                .with_funct3(0b011)
+                .with_csr(*csr)
+                .with_rd(*dest)
+                .with_rs1(*src),
+            Inst::Csrrwi { csr, dest, uimm } => code
+                .with_opcode(0b1110011)
+                .with_funct3(0b101)
+                .with_csr(*csr)
+                .with_rd(*dest)
+                .with_zimm(*uimm),
+            Inst::Csrrsi { csr, dest, uimm } => code
+                .with_opcode(0b1110011)
+                .with_funct3(0b110)
+                .with_csr(*csr)
+                .with_rd(*dest)
+                .with_zimm(*uimm),
+            Inst::Csrrci { csr, dest, uimm } => code
+                .with_opcode(0b1110011)
+                .with_funct3(0b111)
+                .with_csr(*csr)
+                .with_rd(*dest)
+                .with_zimm(*uimm),
+            
+            // F extension instructions
+            Inst::Flw { offset, dest, base } => code
+                .with_opcode(0b0000111)
+                .with_funct3(0b010)
+                .with_imm_i(*offset)
+                .with_frd(*dest)
+                .with_rs1(*base),
+            Inst::Fsw { offset, src, base } => code
+                .with_opcode(0b0100111)
+                .with_funct3(0b010)
+                .with_imm_s(*offset)
+                .with_frs2(*src)
+                .with_rs1(*base),
+            Inst::FmaddS { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1000011)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b00),
+            Inst::FmsubS { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1000111)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b00),
+            Inst::FnmsubS { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1001011)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b00),
+            Inst::FnmaddS { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1001111)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b00),
+            Inst::FaddS { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0000000)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsubS { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0000100)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FmulS { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0001000)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FdivS { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0001100)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsqrtS { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0101100)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src)
+                .with_frs2(FReg(0)),
+            Inst::FsgnjS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010000)
+                .with_funct3(0b000)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsgnjnS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010000)
+                .with_funct3(0b001)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsgnjxS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010000)
+                .with_funct3(0b010)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FminS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010100)
+                .with_funct3(0b000)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FmaxS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010100)
+                .with_funct3(0b001)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FcvtWS { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100000)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(0),
+            Inst::FcvtWuS { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100000)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(1),
+            Inst::FmvXW { dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1110000)
+                .with_funct3(0b000)
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_frs2(FReg(0)),
+            Inst::FeqS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1010000)
+                .with_funct3(0b010)
+                .with_rd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FltS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1010000)
+                .with_funct3(0b001)
+                .with_rd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FleS { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1010000)
+                .with_funct3(0b000)
+                .with_rd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FclassS { dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1110000)
+                .with_funct3(0b001)
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_frs2(FReg(0)),
+            Inst::FcvtSW { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101000)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(0),
+            Inst::FcvtSWu { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101000)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(1),
+            Inst::FmvWX { dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1111000)
+                .with_funct3(0b000)
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_frs2(FReg(0)),
+            
+            // D extension instructions
+            Inst::Fld { offset, dest, base } => code
+                .with_opcode(0b0000111)
+                .with_funct3(0b011)
+                .with_imm_i(*offset)
+                .with_frd(*dest)
+                .with_rs1(*base),
+            Inst::Fsd { offset, src, base } => code
+                .with_opcode(0b0100111)
+                .with_funct3(0b011)
+                .with_imm_s(*offset)
+                .with_frs2(*src)
+                .with_rs1(*base),
+            Inst::FmaddD { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1000011)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b01),
+            Inst::FmsubD { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1000111)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b01),
+            Inst::FnmsubD { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1001011)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b01),
+            Inst::FnmaddD { rm, dest, src1, src2, src3 } => code
+                .with_opcode(0b1001111)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2)
+                .with_frs3(*src3)
+                .with_fp_fmt(0b01),
+            Inst::FaddD { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0000001)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsubD { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0000101)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FmulD { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0001001)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FdivD { rm, dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0001101)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsqrtD { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0101101)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src)
+                .with_frs2(FReg(0)),
+            Inst::FsgnjD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010001)
+                .with_funct3(0b000)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsgnjnD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010001)
+                .with_funct3(0b001)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FsgnjxD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010001)
+                .with_funct3(0b010)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FminD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010101)
+                .with_funct3(0b000)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FmaxD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0010101)
+                .with_funct3(0b001)
+                .with_frd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FcvtSD { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0100000)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(1),
+            Inst::FcvtDS { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b0100001)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(0),
+            Inst::FeqD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1010001)
+                .with_funct3(0b010)
+                .with_rd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FltD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1010001)
+                .with_funct3(0b001)
+                .with_rd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FleD { dest, src1, src2 } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1010001)
+                .with_funct3(0b000)
+                .with_rd(*dest)
+                .with_frs1(*src1)
+                .with_frs2(*src2),
+            Inst::FclassD { dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1110001)
+                .with_funct3(0b001)
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_frs2(FReg(0)),
+            Inst::FcvtWD { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100001)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(0),
+            Inst::FcvtWuD { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100001)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(1),
+            Inst::FcvtDW { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101001)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(0),
+            Inst::FcvtDWu { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101001)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(1),
+            
+            // RV64 F/D instructions
+            Inst::FcvtLS { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100000)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(2),
+            Inst::FcvtLuS { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100000)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(3),
+            Inst::FcvtSL { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101000)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(2),
+            Inst::FcvtSLu { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101000)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(3),
+            Inst::FcvtLD { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100001)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(2),
+            Inst::FcvtLuD { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1100001)
+                .with_rm(rm.to_rm())
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(3),
+            Inst::FmvXD { dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1110001)
+                .with_funct3(0b000)
+                .with_rd(*dest)
+                .with_frs1(*src)
+                .with_fcvt_type(0),
+            Inst::FcvtDL { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101001)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(2),
+            Inst::FcvtDLu { rm, dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1101001)
+                .with_rm(rm.to_rm())
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(3),
+            Inst::FmvDX { dest, src } => code
+                .with_opcode(0b1010011)
+                .with_funct7(0b1111001)
+                .with_funct3(0b000)
+                .with_frd(*dest)
+                .with_rs1(*src)
+                .with_fcvt_type(0),
         };
         code.0
     }
@@ -2093,6 +4276,7 @@ mod tests {
     use rayon::iter::IntoParallelRefIterator;
     use rayon::iter::ParallelIterator;
 
+    use crate::Csr;
     use crate::Fence;
     use crate::FenceSet;
     use crate::Imm;
@@ -2364,5 +4548,254 @@ mod tests {
         let section = obj.section_by_name(TEST_SECTION_NAME).unwrap();
         let data = section.data().unwrap();
         data.to_owned()
+    }
+
+    #[test]
+    fn test_zicsr_instructions() {
+        // Test CSRRW
+        let inst = Inst::Csrrw {
+            csr: Csr::MSTATUS,
+            dest: Reg::A0,
+            src: Reg::A1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test CSRRS
+        let inst = Inst::Csrrs {
+            csr: Csr::MISA,
+            dest: Reg::A2,
+            src: Reg::A3,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test CSRRWI
+        let inst = Inst::Csrrwi {
+            csr: Csr::MEDELEG,
+            dest: Reg::A4,
+            uimm: Imm::new_u32(5),
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_f_extension_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test FLW
+        let inst = Inst::Flw {
+            offset: Imm::new_i32(4),
+            dest: FReg::FA0,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FSW
+        let inst = Inst::Fsw {
+            offset: Imm::new_i32(8),
+            src: FReg::FA1,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FADD.S
+        let inst = Inst::FaddS {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FMADD.S
+        let inst = Inst::FmaddS {
+            rm: RoundingMode::RoundToNearestTiesToEven,
+            dest: FReg::FT0,
+            src1: FReg::FT1,
+            src2: FReg::FT2,
+            src3: FReg::FT3,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.W.S
+        let inst = Inst::FcvtWS {
+            rm: RoundingMode::RoundTowardsZero,
+            dest: Reg::A0,
+            src: FReg::FA0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FEQ.S
+        let inst = Inst::FeqS {
+            dest: Reg::A0,
+            src1: FReg::FA0,
+            src2: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_d_extension_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test FLD
+        let inst = Inst::Fld {
+            offset: Imm::new_i32(16),
+            dest: FReg::FA0,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FSD
+        let inst = Inst::Fsd {
+            offset: Imm::new_i32(24),
+            src: FReg::FA1,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FADD.D
+        let inst = Inst::FaddD {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.D.S
+        let inst = Inst::FcvtDS {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.S.D
+        let inst = Inst::FcvtSD {
+            rm: RoundingMode::RoundDown,
+            dest: FReg::FA0,
+            src: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FEQ.D
+        let inst = Inst::FeqD {
+            dest: Reg::A0,
+            src1: FReg::FA0,
+            src2: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_rv64_fp_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test FCVT.L.S (RV64 only)
+        let inst = Inst::FcvtLS {
+            rm: RoundingMode::Dynamic,
+            dest: Reg::A0,
+            src: FReg::FA0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.S.L (RV64 only)
+        let inst = Inst::FcvtSL {
+            rm: RoundingMode::RoundUp,
+            dest: FReg::FA0,
+            src: Reg::A0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FMV.X.D (RV64 only)
+        let inst = Inst::FmvXD {
+            dest: Reg::A0,
+            src: FReg::FA0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FMV.D.X (RV64 only)
+        let inst = Inst::FmvDX {
+            dest: FReg::FA0,
+            src: Reg::A0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_display_fp_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test display for FLW
+        let inst = Inst::Flw {
+            offset: Imm::new_i32(4),
+            dest: FReg::FA0,
+            base: Reg::SP,
+        };
+        assert_eq!(std::format!("{}", inst), "flw fa0, 4(sp)");
+
+        // Test display for FADD.S with dynamic rounding
+        let inst = Inst::FaddS {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        assert_eq!(std::format!("{}", inst), "fadd.s fa0, fa1, fa2");
+
+        // Test display for FADD.S with explicit rounding
+        let inst = Inst::FaddS {
+            rm: RoundingMode::RoundToNearestTiesToEven,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        assert_eq!(std::format!("{}", inst), "fadd.s fa0, fa1, fa2, rne");
+
+        // Test display for CSRRW
+        let inst = Inst::Csrrw {
+            csr: Csr::MSTATUS,
+            dest: Reg::A0,
+            src: Reg::A1,
+        };
+        assert_eq!(std::format!("{}", inst), "csrrw a0, 0x300, a1");
     }
 }
