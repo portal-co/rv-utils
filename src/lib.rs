@@ -250,7 +250,7 @@ impl Imm {
 
     /// Get the `u64` (RV64) value of the immediate.
     pub const fn as_u64(self) -> u64 {
-        self.0 as u64
+        self.0
     }
 
     /// Get the `i64` (RV64) value of the immediate.
@@ -2953,6 +2953,19 @@ impl Inst {
                                     src: code.rs1(),
                                 }
                             }
+                            // FCVT.S.D (converts double to single)
+                            0b0100000 => {
+                                if code.frs2().0 != 1 {
+                                    return Err(decode_error(code, "FCVT.S.D rs2 must be 1"));
+                                }
+                                let rm = RoundingMode::from_rm(code.rm())
+                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
+                                Inst::FcvtSD {
+                                    rm,
+                                    dest: code.frd(),
+                                    src: code.frs1(),
+                                }
+                            }
                             _ => return Err(decode_error(code, "OP-FP.S funct7")),
                         }
                     }
@@ -3050,19 +3063,6 @@ impl Inst {
                                 },
                                 _ => return Err(decode_error(code, "FMIN/FMAX.D funct3")),
                             },
-                            // FCVT.S.D
-                            0b0100000 => {
-                                if code.frs2().0 != 1 {
-                                    return Err(decode_error(code, "FCVT.S.D rs2 must be 1"));
-                                }
-                                let rm = RoundingMode::from_rm(code.rm())
-                                    .ok_or_else(|| decode_error(code, "invalid rounding mode"))?;
-                                Inst::FcvtSD {
-                                    rm,
-                                    dest: code.frd(),
-                                    src: code.frs1(),
-                                }
-                            }
                             // FCVT.D.S
                             0b0100001 => {
                                 if code.frs2().0 != 0 {
@@ -4293,5 +4293,254 @@ mod tests {
         let section = obj.section_by_name(TEST_SECTION_NAME).unwrap();
         let data = section.data().unwrap();
         data.to_owned()
+    }
+
+    #[test]
+    fn test_zicsr_instructions() {
+        // Test CSRRW
+        let inst = Inst::Csrrw {
+            csr: 0x300,
+            dest: Reg::A0,
+            src: Reg::A1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test CSRRS
+        let inst = Inst::Csrrs {
+            csr: 0x301,
+            dest: Reg::A2,
+            src: Reg::A3,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test CSRRWI
+        let inst = Inst::Csrrwi {
+            csr: 0x302,
+            dest: Reg::A4,
+            uimm: 5,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_f_extension_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test FLW
+        let inst = Inst::Flw {
+            offset: Imm::new_i32(4),
+            dest: FReg::FA0,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FSW
+        let inst = Inst::Fsw {
+            offset: Imm::new_i32(8),
+            src: FReg::FA1,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FADD.S
+        let inst = Inst::FaddS {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FMADD.S
+        let inst = Inst::FmaddS {
+            rm: RoundingMode::RoundToNearestTiesToEven,
+            dest: FReg::FT0,
+            src1: FReg::FT1,
+            src2: FReg::FT2,
+            src3: FReg::FT3,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.W.S
+        let inst = Inst::FcvtWS {
+            rm: RoundingMode::RoundTowardsZero,
+            dest: Reg::A0,
+            src: FReg::FA0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FEQ.S
+        let inst = Inst::FeqS {
+            dest: Reg::A0,
+            src1: FReg::FA0,
+            src2: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_d_extension_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test FLD
+        let inst = Inst::Fld {
+            offset: Imm::new_i32(16),
+            dest: FReg::FA0,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FSD
+        let inst = Inst::Fsd {
+            offset: Imm::new_i32(24),
+            src: FReg::FA1,
+            base: Reg::SP,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FADD.D
+        let inst = Inst::FaddD {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.D.S
+        let inst = Inst::FcvtDS {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.S.D
+        let inst = Inst::FcvtSD {
+            rm: RoundingMode::RoundDown,
+            dest: FReg::FA0,
+            src: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FEQ.D
+        let inst = Inst::FeqD {
+            dest: Reg::A0,
+            src1: FReg::FA0,
+            src2: FReg::FA1,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv32);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv32).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_rv64_fp_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test FCVT.L.S (RV64 only)
+        let inst = Inst::FcvtLS {
+            rm: RoundingMode::Dynamic,
+            dest: Reg::A0,
+            src: FReg::FA0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FCVT.S.L (RV64 only)
+        let inst = Inst::FcvtSL {
+            rm: RoundingMode::RoundUp,
+            dest: FReg::FA0,
+            src: Reg::A0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FMV.X.D (RV64 only)
+        let inst = Inst::FmvXD {
+            dest: Reg::A0,
+            src: FReg::FA0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+
+        // Test FMV.D.X (RV64 only)
+        let inst = Inst::FmvDX {
+            dest: FReg::FA0,
+            src: Reg::A0,
+        };
+        let encoded = inst.encode_normal(Xlen::Rv64);
+        let (decoded, _) = Inst::decode(encoded, Xlen::Rv64).unwrap();
+        assert_eq!(inst, decoded);
+    }
+
+    #[test]
+    fn test_display_fp_instructions() {
+        use crate::{FReg, RoundingMode};
+        
+        // Test display for FLW
+        let inst = Inst::Flw {
+            offset: Imm::new_i32(4),
+            dest: FReg::FA0,
+            base: Reg::SP,
+        };
+        assert_eq!(std::format!("{}", inst), "flw fa0, 4(sp)");
+
+        // Test display for FADD.S with dynamic rounding
+        let inst = Inst::FaddS {
+            rm: RoundingMode::Dynamic,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        assert_eq!(std::format!("{}", inst), "fadd.s fa0, fa1, fa2");
+
+        // Test display for FADD.S with explicit rounding
+        let inst = Inst::FaddS {
+            rm: RoundingMode::RoundToNearestTiesToEven,
+            dest: FReg::FA0,
+            src1: FReg::FA1,
+            src2: FReg::FA2,
+        };
+        assert_eq!(std::format!("{}", inst), "fadd.s fa0, fa1, fa2, rne");
+
+        // Test display for CSRRW
+        let inst = Inst::Csrrw {
+            csr: 0x300,
+            dest: Reg::A0,
+            src: Reg::A1,
+        };
+        assert_eq!(std::format!("{}", inst), "csrrw a0, 0x300, a1");
     }
 }

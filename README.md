@@ -28,6 +28,9 @@ The decoder currently supports the following instructions:
   - [x] Zaamo standard extension
 - [x] C standard extension
 - [x] Zihintpause standard extension
+- [x] Zicsr standard extension (Control and Status Register instructions)
+- [x] F standard extension (Single-Precision Floating-Point)
+- [x] D standard extension (Double-Precision Floating-Point)
 
 More extensions may be implemented in the future.
 
