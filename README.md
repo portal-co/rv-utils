@@ -76,3 +76,12 @@ Additionally, it's also tested as part of an emulator, which tests many differen
 # MSRV
 
 This crate targets the latest stable as its MSRV.
+
+## Goals
+- [ ] Add project goals
+
+## Progress
+- [ ] Initial setup
+
+---
+*AI assisted*
