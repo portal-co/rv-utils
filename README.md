@@ -78,10 +78,12 @@ Additionally, it's also tested as part of an emulator, which tests many differen
 This crate targets the latest stable as its MSRV.
 
 ## Goals
-- [ ] Add project goals
+- [ ] Decode/Encode RISC-V instructions
+- [ ] Support multiple ISA extensions (I, M, A, C, F, D)
 
 ## Progress
-- [ ] Initial setup
+- [ ] Decoder implemented for RV32I, M, A, C, Zicsr, F, D
+- [ ] Extensive testing and documentation provided
 
 ---
 *AI assisted*
