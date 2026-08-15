@@ -2185,10 +2185,34 @@ impl Inst {
                             src1: code.rs1_short(),
                         },
                         0b11 => {
-                            if bit12 != 0 {
-                                return Err(decode_error(code, "C1 Arith bit 12"));
-                            }
                             let funct2 = code.extract(5..=6);
+                            if bit12 != 0 {
+                                // RV64C/RV128C-only C.SUBW/C.ADDW: same
+                                // quadrant-1 "arith" family as C.SUB/C.XOR/
+                                // C.OR/C.AND above, distinguished by bit 12
+                                // (funct6 100111 vs 100011). funct2 0b10/
+                                // 0b11 are reserved (RV128C MULW and an
+                                // undefined slot) -- not decoded here, same
+                                // as any other reserved encoding.
+                                if xlen.is_32() {
+                                    return Err(decode_error(code, "C.SUBW/C.ADDW only on RV64"));
+                                }
+                                return match funct2 {
+                                    // C.SUBW -> subw \rd', \rd', \rs2'
+                                    0b00 => Ok(Inst::SubW {
+                                        dest: code.rs1_short(),
+                                        src1: code.rs1_short(),
+                                        src2: code.rs2_short(),
+                                    }),
+                                    // C.ADDW -> addw \rd', \rd', \rs2'
+                                    0b01 => Ok(Inst::AddW {
+                                        dest: code.rs1_short(),
+                                        src1: code.rs1_short(),
+                                        src2: code.rs2_short(),
+                                    }),
+                                    _ => Err(decode_error(code, "C1 Arith bit 12 funct2 reserved")),
+                                };
+                            }
                             match funct2 {
                                 // C.SUB -> sub \rd', \rd', \rs2'
                                 0b00 => Inst::Sub {
@@ -4339,6 +4363,34 @@ mod tests {
             "size of instruction is too large: {}",
             size_of::<Inst>()
         );
+    }
+
+    /// `C.ADDW`/`C.SUBW` (quadrant-1 "arith" family, bit12=1) used to be
+    /// rejected unconditionally with a decode error -- only the bit12=0
+    /// case (C.SUB/C.XOR/C.OR/C.AND) was implemented. `addw a0, a0, a1`
+    /// compresses to `0x9d2d` (rd/rs1'=x10/a0, rs2'=x11/a1); `subw` is the
+    /// same encoding with funct2 bits[6:5]=00 instead of 01.
+    #[test]
+    fn compressed_addw_subw_decode() {
+        let addw = Inst::decode_compressed(0x9d2d, Xlen::Rv64).expect("C.ADDW should decode");
+        assert_eq!(
+            addw,
+            Inst::AddW { dest: Reg::A0, src1: Reg::A0, src2: Reg::A1 }
+        );
+
+        let subw = 0x9d2d & !(0b11 << 5); // clear funct2 bits[6:5] -> 0b00 (SUBW)
+        let subw = Inst::decode_compressed(subw, Xlen::Rv64).expect("C.SUBW should decode");
+        assert_eq!(
+            subw,
+            Inst::SubW { dest: Reg::A0, src1: Reg::A0, src2: Reg::A1 }
+        );
+
+        // RV64C/RV128C-only: rejected under RV32.
+        assert!(Inst::decode_compressed(0x9d2d, Xlen::Rv32).is_err());
+
+        // Reserved funct2 (bits[6:5] = 10/11) stays a decode error.
+        let reserved = (0x9d2d & !(0b11 << 5)) | (0b10 << 5);
+        assert!(Inst::decode_compressed(reserved, Xlen::Rv64).is_err());
     }
 
     const TEST_SECTION_NAME: &str = ".text.rvdctest";
