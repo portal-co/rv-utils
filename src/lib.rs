@@ -2180,7 +2180,16 @@ impl Inst {
                         }
                         // C.ANDI -> andi \rd', \rd', \imm
                         0b10 => Inst::Andi {
-                            imm: code.immediate_u(&[(2..=6, 0), (12..=12, 5)]),
+                            // The C.ANDI immediate is *sign*-extended
+                            // (RISC-V unprivileged spec, "C.ADDI16SL/
+                            // C.LI/C.LUI/C.ANDI" expansion table: imm[5]
+                            // is the sign bit). `immediate_u` here would
+                            // produce a positive Imm for negative immediates
+                            // (e.g. `c.andi a0, -22` decoded as +42), and
+                            // both the interpreter and the JS JIT lower
+                            // `andi` with that raw value — a semantic bug
+                            // the cross-fuzz proptest found via Unicorn.
+                            imm: code.immediate_s(&[(2..=6, 0), (12..=12, 5)]),
                             dest: code.rs1_short(),
                             src1: code.rs1_short(),
                         },
@@ -4287,6 +4296,22 @@ impl Inst {
 #[cfg(test)]
 mod tests {
     extern crate std;
+    #[test]
+    fn c_andi_imm_is_sign_extended() {
+        // 0x9829 = c.andi s0, s0, -22 (imm[5] is a sign bit, not +42).
+        // Found by vane's cross-fuzz proptest (CROSS_FUZZ_PLAN.md M1):
+        // Vane's lowering of `c.andi s0, s0, <negative>` masked with +42
+        // where Unicorn (QEMU RV64GC) masked with -22 — the immediate was
+        // assembled with `immediate_u` instead of `immediate_s`.
+        let inst = Inst::decode(0x9829, Xlen::Rv64).unwrap().0;
+        let Inst::Andi { imm, dest, src1 } = inst else {
+            panic!("expected Andi, got {inst:?}");
+        };
+        assert_eq!(imm.as_i64(), -22);
+        assert_eq!(dest, Reg(8));
+        assert_eq!(src1, Reg(8));
+    }
+
     use core::sync::atomic::AtomicU32;
     use core::sync::atomic::Ordering;
     use core::u32;
