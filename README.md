@@ -39,22 +39,22 @@ More extensions may be implemented in the future.
 ```rust
 // addi sp, sp, -0x20 (compressed)
 let x = 0x1101_u32;
-let expected = rvdc::Inst::Addi { imm: rvdc::Imm::new_i32(-0x20), dest: rvdc::Reg::SP, src1: rvdc::Reg::SP };
+let expected = rv_asm::Inst::Addi { imm: rv_asm::Imm::new_i32(-0x20), dest: rv_asm::Reg::SP, src1: rv_asm::Reg::SP };
 
-let (inst, is_compressed) = rvdc::Inst::decode(x, rvdc::Xlen::Rv32).unwrap();
+let (inst, is_compressed) = rv_asm::Inst::decode(x, rv_asm::Xlen::Rv32).unwrap();
 assert_eq!(inst, expected);
-assert_eq!(is_compressed, rvdc::IsCompressed::Yes);
+assert_eq!(is_compressed, rv_asm::IsCompressed::Yes);
 assert_eq!(format!("{inst}"), "addi sp, sp, -32")
 ```
 
 ```rust
 // auipc t1, 0xa
 let x = 0x0000a317;
-let expected = rvdc::Inst::Auipc { uimm: rvdc::Imm::new_u32(0xa << 12), dest: rvdc::Reg::T1 };
+let expected = rv_asm::Inst::Auipc { uimm: rv_asm::Imm::new_u32(0xa << 12), dest: rv_asm::Reg::T1 };
 
-let (inst, is_compressed) = rvdc::Inst::decode(x, rvdc::Xlen::Rv32).unwrap();
+let (inst, is_compressed) = rv_asm::Inst::decode(x, rv_asm::Xlen::Rv32).unwrap();
 assert_eq!(inst, expected);
-assert_eq!(is_compressed, rvdc::IsCompressed::No);
+assert_eq!(is_compressed, rv_asm::IsCompressed::No);
 assert_eq!(format!("{inst}"), "auipc t1, 10")
 ```
 

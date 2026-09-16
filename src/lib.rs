@@ -2042,15 +2042,15 @@ impl Inst {
     /// ```rust
     /// // addi sp, sp, -0x20 (compressed)
     /// let x = 0x1101_u32;
-    /// assert!(rvdc::Inst::first_byte_is_compressed(x.to_le_bytes()[0]));
+    /// assert!(rv_asm::Inst::first_byte_is_compressed(x.to_le_bytes()[0]));
     /// let x = 0x1101_u16;
-    /// assert!(rvdc::Inst::first_byte_is_compressed(x.to_le_bytes()[0]));
+    /// assert!(rv_asm::Inst::first_byte_is_compressed(x.to_le_bytes()[0]));
     /// ```
     ///
     /// ```rust
     /// // auipc t1, 0xa
     /// let x = 0x0000a317_u32;
-    /// assert!(!rvdc::Inst::first_byte_is_compressed(x.to_le_bytes()[0]));
+    /// assert!(!rv_asm::Inst::first_byte_is_compressed(x.to_le_bytes()[0]));
     /// ```
     pub fn first_byte_is_compressed(byte: u8) -> bool {
         (byte & 0b11) != 0b11
@@ -2082,9 +2082,9 @@ impl Inst {
     /// ```rust
     /// // Compressed addi sp, sp, -0x20
     /// let x = 0x1101_u16;
-    /// let expected = rvdc::Inst::Addi { imm: rvdc::Imm::new_i32(-0x20), dest: rvdc::Reg::SP, src1: rvdc::Reg::SP };
+    /// let expected = rv_asm::Inst::Addi { imm: rv_asm::Imm::new_i32(-0x20), dest: rv_asm::Reg::SP, src1: rv_asm::Reg::SP };
     ///
-    /// let inst = rvdc::Inst::decode_compressed(x, rvdc::Xlen::Rv32).unwrap();
+    /// let inst = rv_asm::Inst::decode_compressed(x, rv_asm::Xlen::Rv32).unwrap();
     /// assert_eq!(inst, expected);
     /// ```
     pub fn decode_compressed(code: u16, xlen: Xlen) -> Result<Inst, DecodeError> {
