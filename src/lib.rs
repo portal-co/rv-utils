@@ -2185,10 +2185,38 @@ impl Inst {
                         src1: Reg::SP,
                     }
                 }
+                // C.FLD -> fld \dest', \offset(\base')
+                0b001 => Inst::Fld {
+                    offset: code.immediate_u(&[(10..=12, 3), (5..=6, 6)]),
+                    dest: FReg(code.rs2_short().0),
+                    base: code.rs1_short(),
+                },
                 // C.LW -> lw \dest \offset(\base)
                 0b010 => Inst::Lw {
                     offset: code.immediate_u(&[(10..=12, 3), (5..=5, 6), (6..=6, 2)]),
                     dest: code.rs2_short(),
+                    base: code.rs1_short(),
+                },
+                // C.LD (RV64) / C.FLW (RV32)
+                0b011 => {
+                    if xlen.is_64() {
+                        Inst::Ld {
+                            offset: code.immediate_u(&[(10..=12, 3), (5..=6, 6)]),
+                            dest: code.rs2_short(),
+                            base: code.rs1_short(),
+                        }
+                    } else {
+                        Inst::Flw {
+                            offset: code.immediate_u(&[(10..=12, 3), (5..=5, 6), (6..=6, 2)]),
+                            dest: FReg(code.rs2_short().0),
+                            base: code.rs1_short(),
+                        }
+                    }
+                }
+                // C.FSD -> fsd \src', \offset(\base')
+                0b101 => Inst::Fsd {
+                    offset: code.immediate_u(&[(10..=12, 3), (5..=6, 6)]),
+                    src: FReg(code.rs2_short().0),
                     base: code.rs1_short(),
                 },
                 // C.SW -> sw \src, \offset(\base)
@@ -2197,6 +2225,22 @@ impl Inst {
                     src: code.rs2_short(),
                     base: code.rs1_short(),
                 },
+                // C.SD (RV64) / C.FSW (RV32)
+                0b111 => {
+                    if xlen.is_64() {
+                        Inst::Sd {
+                            offset: code.immediate_u(&[(10..=12, 3), (5..=6, 6)]),
+                            src: code.rs2_short(),
+                            base: code.rs1_short(),
+                        }
+                    } else {
+                        Inst::Fsw {
+                            offset: code.immediate_u(&[(10..=12, 3), (5..=5, 6), (6..=6, 2)]),
+                            src: FReg(code.rs2_short().0),
+                            base: code.rs1_short(),
+                        }
+                    }
+                }
                 _ => return Err(decode_error(code, "C0 funct3")),
             },
             // C1
@@ -2207,20 +2251,36 @@ impl Inst {
                     dest: code.rd(),
                     src1: code.rd(),
                 },
-                // C.JAL -> jal ra, \offset
-                0b001 => Inst::Jal {
-                    offset: code.immediate_s(&[
-                        (2..=2, 5),
-                        (3..=5, 1),
-                        (6..=6, 7),
-                        (7..=7, 6),
-                        (8..=8, 10),
-                        (9..=10, 8),
-                        (11..=11, 4),
-                        (12..=12, 11),
-                    ]),
-                    dest: Reg::RA,
-                },
+                // C.ADDIW (RV64) / C.JAL (RV32)
+                0b001 => {
+                    if xlen.is_64() {
+                        // C.ADDIW -> addiw \rd, \rd, \imm (rd ≠ 0 is required)
+                        let dest = code.rd();
+                        if dest.0 == 0 {
+                            return Err(decode_error(code, "C.ADDIW rd must not be zero"));
+                        }
+                        Inst::AddiW {
+                            imm: code.immediate_s(&[(2..=6, 0), (12..=12, 5)]),
+                            dest,
+                            src1: dest,
+                        }
+                    } else {
+                        // C.JAL -> jal ra, \offset
+                        Inst::Jal {
+                            offset: code.immediate_s(&[
+                                (2..=2, 5),
+                                (3..=5, 1),
+                                (6..=6, 7),
+                                (7..=7, 6),
+                                (8..=8, 10),
+                                (9..=10, 8),
+                                (11..=11, 4),
+                                (12..=12, 11),
+                            ]),
+                            dest: Reg::RA,
+                        }
+                    }
+                }
                 // C.LI -> addi \rd, zero, \imm
                 0b010 => Inst::Addi {
                     imm: code.immediate_s(&[(2..=6, 0), (12..=12, 5)]),
@@ -2233,8 +2293,9 @@ impl Inst {
                     match code.funct2() {
                         // C.SRLI -> srli \rd', \rd', \imm
                         0b00 => {
-                            if bit12 != 0 {
-                                return Err(decode_error(code, "C.SRLI imm"));
+                            // bit12 is shamt[5]: valid on RV64, reserved on RV32.
+                            if xlen.is_32() && bit12 != 0 {
+                                return Err(decode_error(code, "C.SRLI shamt[5] is reserved on RV32"));
                             }
 
                             Inst::Srli {
@@ -2245,8 +2306,8 @@ impl Inst {
                         }
                         // C.SRAI -> srai \rd', \rd', \imm
                         0b01 => {
-                            if bit12 != 0 {
-                                return Err(decode_error(code, "C.SRLI imm"));
+                            if xlen.is_32() && bit12 != 0 {
+                                return Err(decode_error(code, "C.SRAI shamt[5] is reserved on RV32"));
                             }
 
                             Inst::Srai {
@@ -2401,8 +2462,10 @@ impl Inst {
             0b10 => match code.funct3() {
                 // C.SLLI -> slli \rd, \rd, \imm
                 0b000 => {
-                    if code.extract(12..=12) != 0 {
-                        return Err(decode_error(code, "C.SLLI shift amount must be zero"));
+                    // On RV32, bit 12 (shamt[5]) must be zero; on RV64 it is
+                    // a valid sixth shift-amount bit (shamt 0..=63).
+                    if xlen.is_32() && code.extract(12..=12) != 0 {
+                        return Err(decode_error(code, "C.SLLI shamt[5] is reserved on RV32"));
                     }
                     Inst::Slli {
                         imm: code.immediate_u(&[(2..=6, 0), (12..=12, 5)]),
@@ -2410,6 +2473,12 @@ impl Inst {
                         src1: code.rd(),
                     }
                 }
+                // C.FLDSP -> fld \dest, \offset(sp)
+                0b001 => Inst::Fld {
+                    offset: code.immediate_u(&[(12..=12, 5), (5..=6, 3), (2..=4, 6)]),
+                    dest: FReg(code.rd().0),
+                    base: Reg::SP,
+                },
                 // C.LWSP -> lw \reg \offset(sp)
                 0b010 => {
                     let dest = code.rd();
@@ -2435,7 +2504,12 @@ impl Inst {
                     }
 
                     Inst::Ld {
-                        offset: code.immediate_u(&[(12..=12, 5), (4..=6, 2), (2..=3, 6)]),
+                        // Per the C.LDSP encoding (and riscv-unified-db):
+                        // offset[5]=inst[12], offset[4:3]=inst[6:5],
+                        // offset[8:6]=inst[4:2]. The previous mapping
+                        // ([(4..=6, 2), (2..=3, 6)]) was the C.LWSP layout and
+                        // misplaced offset bit 2/8.
+                        offset: code.immediate_u(&[(12..=12, 5), (5..=6, 3), (2..=4, 6)]),
                         dest,
                         base: Reg::SP,
                     }
@@ -2479,6 +2553,12 @@ impl Inst {
                         _ => return Err(decode_error(code, "C2 funct=100 inst")),
                     }
                 }
+                // C.FSDSP -> fsd \src, \offset(sp)
+                0b101 => Inst::Fsd {
+                    offset: code.immediate_u(&[(10..=12, 3), (7..=9, 6)]),
+                    src: FReg(code.rs2().0),
+                    base: Reg::SP,
+                },
                 // C.SWSP -> sw \reg \offset(sp)
                 0b110 => Inst::Sw {
                     offset: code.immediate_u(&[(7..=8, 6), (9..=12, 2)]),
@@ -2491,7 +2571,9 @@ impl Inst {
                         return Err(decode_error(code, "C.SDSP is not allowed on RV32"));
                     }
                     Inst::Sd {
-                        offset: code.immediate_u(&[(7..=9, 6), (10..=12, 3)]),
+                        // C.SDSP: offset[5:3]=inst[12:10], offset[8:6]=inst[9:7].
+                        // The previous mapping was C.SWSP's (word-sized) layout.
+                        offset: code.immediate_u(&[(10..=12, 3), (7..=9, 6)]),
                         src: code.rs2(),
                         base: Reg::SP,
                     }
@@ -4435,6 +4517,75 @@ mod tests {
         // Garbage SYSTEM encodings still fail closed.
         assert!(Inst::decode(0x7fe00073, Xlen::Rv64).is_err());
         assert!(Inst::decode(0x302000f3, Xlen::Rv64).is_err()); // mret with rd != 0
+    }
+
+    /// RV64C audit additions (M2 follow-up, PLAN_LINUX_WASM.md §7.1):
+    /// C.LD/C.SD/C.FLD/C.FSD/C.FLDSP/C.FSDSP/C.ADDIW plus the corrected
+    /// C.LDSP/C.SDSP offset layouts (verified against riscv-unified-db).
+    #[test]
+    fn rv64c_load_store_decode() {
+        use crate::{FReg, Inst, Reg, Xlen};
+        // c.sd s1, 16(a0)
+        let (i, c) = Inst::decode(0xe904, Xlen::Rv64).unwrap();
+        assert_eq!(c, crate::IsCompressed::Yes);
+        match i {
+            Inst::Sd { offset, src, base } => {
+                assert_eq!(offset.as_u32(), 16);
+                assert_eq!(src, Reg(9));
+                assert_eq!(base, Reg(10));
+            }
+            other => panic!("expected Sd, got {other:?}"),
+        }
+        // c.ld s0, 24(s1)
+        let (i, _) = Inst::decode(0x6c80, Xlen::Rv64).unwrap();
+        match i {
+            Inst::Ld { offset, dest, base } => {
+                assert_eq!(offset.as_u32(), 24);
+                assert_eq!(dest, Reg(8));
+                assert_eq!(base, Reg(9));
+            }
+            other => panic!("expected Ld, got {other:?}"),
+        }
+        // c.sdsp ra, 40(sp)
+        let (i, _) = Inst::decode(0xf406, Xlen::Rv64).unwrap();
+        match i {
+            Inst::Sd { offset, src, base } => {
+                assert_eq!(offset.as_u32(), 40);
+                assert_eq!(src, Reg(1));
+                assert_eq!(base, Reg(2));
+            }
+            other => panic!("expected Sd (C.SDSP), got {other:?}"),
+        }
+        // c.ldsp a0, 8(sp)
+        let (i, _) = Inst::decode(0x6522, Xlen::Rv64).unwrap();
+        match i {
+            Inst::Ld { offset, dest, base } => {
+                assert_eq!(offset.as_u32(), 8);
+                assert_eq!(dest, Reg(10));
+                assert_eq!(base, Reg(2));
+            }
+            other => panic!("expected Ld (C.LDSP), got {other:?}"),
+        }
+        // c.addiw a0, -1 (RV64 only — must not decode as C.JAL)
+        let (i, _) = Inst::decode(0x357d, Xlen::Rv64).unwrap();
+        match i {
+            Inst::AddiW { imm, dest, src1 } => {
+                assert_eq!(imm.as_i64(), -1);
+                assert_eq!(dest, Reg(10));
+                assert_eq!(src1, Reg(10));
+            }
+            other => panic!("expected AddiW, got {other:?}"),
+        }
+        // C.LD must not exist on RV32 (that slot is C.FLW).
+        let (i, _) = Inst::decode(0x6c80, Xlen::Rv32).unwrap();
+        match i {
+            Inst::Flw { offset, dest, base } => {
+                assert_eq!(offset.as_u32(), 24, "C.FLW uses the C.LW-style layout");
+                assert_eq!(dest, FReg(8));
+                assert_eq!(base, Reg(9));
+            }
+            other => panic!("expected Flw, got {other:?}"),
+        }
     }
 
     #[test]
