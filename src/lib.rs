@@ -373,6 +373,56 @@ impl Csr {
     /// "The satp register is an SXLEN-bit read/write register, which controls supervisor-mode 
     /// address translation and protection."
     pub const SATP: Csr = Csr(0x180);
+
+    /// Supervisor environment configuration (senvcfg, CSR address 0x10A)
+    pub const SENVCFG: Csr = Csr(0x10A);
+
+    /// Supervisor time compare (stimecmp, CSR address 0x14D, Sstc extension)
+    pub const STIMECMP: Csr = Csr(0x14D);
+
+    /// Machine environment configuration (menvcfg, CSR address 0x30A)
+    ///
+    /// RISC-V Privileged Specification Quote:
+    /// "The menvcfg CSR is a 64-bit read/write register ... that controls certain
+    /// characteristics of the execution environment."
+    pub const MENVCFG: Csr = Csr(0x30A);
+
+    /// Machine counter-inhibit (mcountinhibit, CSR address 0x320)
+    pub const MCOUNTINHIBIT: Csr = Csr(0x320);
+
+    /// Machine second trap value (mtval2, CSR address 0x34B)
+    pub const MTVAL2: Csr = Csr(0x34B);
+
+    /// Machine trap instruction (mtinst, CSR address 0x34A)
+    pub const MTINST: Csr = Csr(0x34A);
+
+    /// Machine security configuration (mseccfg, CSR address 0x747)
+    pub const MSECCFG: Csr = Csr(0x747);
+
+    /// Machine vendor ID (mvendorid, CSR address 0xF11)
+    pub const MVENDORID: Csr = Csr(0xF11);
+
+    /// Machine architecture ID (marchid, CSR address 0xF12)
+    pub const MARCHID: Csr = Csr(0xF12);
+
+    /// Machine implementation ID (mimpid, CSR address 0xF13)
+    pub const MIMPID: Csr = Csr(0xF13);
+
+    /// Machine hart ID (mhartid, CSR address 0xF14)
+    pub const MHARTID: Csr = Csr(0xF14);
+
+    /// PMP configuration register `n` (pmpcfg0..=pmpcfg15, CSR addresses
+    /// 0x3A0..=0x3AF). Out-of-range `n` yields a reserved address; emulators
+    /// should reject the access per their own PMP model.
+    pub const fn pmpcfg(n: u16) -> Csr {
+        Csr(0x3A0 + (n & 0xF))
+    }
+
+    /// PMP address register `n` (pmpaddr0..=pmpaddr63, CSR addresses
+    /// 0x3B0..=0x3EF). See [`Csr::pmpcfg`].
+    pub const fn pmpaddr(n: u16) -> Csr {
+        Csr(0x3B0 + (n & 0x3F))
+    }
     
     /// Floating-Point Accrued Exceptions (fflags, CSR address 0x001)
     /// 
@@ -631,6 +681,29 @@ pub enum Inst {
     Ecall,
     /// EBREAK, break into debugger
     Ebreak,
+
+    // ------------- Privileged ISA (SYSTEM major opcode, funct3 = 000) -------------
+    /// MRET, return from a machine-mode trap
+    ///
+    /// RISC-V Privileged Specification Quote:
+    /// "To return after handling a trap, there are separate trap return instructions
+    /// per privilege level: MRET and SRET."
+    Mret,
+    /// SRET, return from a supervisor-mode trap
+    Sret,
+    /// WFI, wait for interrupt
+    ///
+    /// RISC-V Privileged Specification Quote:
+    /// "The Wait for Interrupt instruction (WFI) provides a hint to the implementation
+    /// that the current hart can be stalled until an interrupt might need servicing."
+    Wfi,
+    /// SFENCE.VMA, supervisor virtual-memory fence (address operand in `addr`,
+    /// ASID operand in `asid`; either may be `x0` to mean "all")
+    ///
+    /// RISC-V Privileged Specification Quote:
+    /// "The SFENCE.VMA instruction is used to synchronize updates to in-memory
+    /// memory-management data structures with current execution."
+    SfenceVma { addr: Reg, asid: Reg },
 
     // ------------- M extension -------------
     /// Multiply
@@ -1340,6 +1413,10 @@ impl Display for Inst {
             },
             Inst::Ecall => write!(f, "ecall"),
             Inst::Ebreak => write!(f, "ebreak"),
+            Inst::Mret => write!(f, "mret"),
+            Inst::Sret => write!(f, "sret"),
+            Inst::Wfi => write!(f, "wfi"),
+            Inst::SfenceVma { addr, asid } => write!(f, "sfence.vma {addr}, {asid}"),
             Inst::Mul { dest, src1, src2 } => write!(f, "mul {dest}, {src1}, {src2}"),
             Inst::MulW { dest, src1, src2 } => write!(f, "mulw {dest}, {src1}, {src2}"),
             Inst::Mulh { dest, src1, src2 } => write!(f, "mulh {dest}, {src1}, {src2}"),
@@ -2771,17 +2848,29 @@ impl Inst {
                     return Err(decode_error(code, "unimp instruction"));
                 }
                 match code.funct3() {
-                    // ECALL/EBREAK
+                    // ECALL/EBREAK/privileged trap-return and fence instructions
                     0b000 => {
                         if code.rd().0 != 0 {
                             return Err(decode_error(code, "SYSTEM rd"));
                         }
-                        if code.rs1().0 != 0 {
-                            return Err(decode_error(code, "SYSTEM rs1"));
-                        }
-                        match code.imm_i().as_u32() {
-                            0b000000000000 => Inst::Ecall,
-                            0b000000000001 => Inst::Ebreak,
+                        // funct12 (imm_i is not sign-extended for any of the
+                        // defined SYSTEM instructions: all funct12 values in
+                        // use are below 0x800).
+                        match code.imm_i().as_u32() & 0xfff {
+                            0b000000000000 if code.rs1().0 == 0 => Inst::Ecall,
+                            0b000000000001 if code.rs1().0 == 0 => Inst::Ebreak,
+                            // SRET
+                            0b000100000010 if code.rs1().0 == 0 => Inst::Sret,
+                            // MRET
+                            0b001100000010 if code.rs1().0 == 0 => Inst::Mret,
+                            // WFI
+                            0b000100000101 if code.rs1().0 == 0 => Inst::Wfi,
+                            // SFENCE.VMA (funct7 = 0001001; rs1 is a real
+                            // operand here — the address to fence)
+                            i if (i >> 5) == 0b0001001 => Inst::SfenceVma {
+                                addr: code.rs1(),
+                                asid: code.rs2(),
+                            },
                             _ => return Err(decode_error(code, "SYSTEM imm")),
                         }
                     }
@@ -3715,6 +3804,20 @@ impl Inst {
             Inst::Ebreak => code
                 .with_opcode(0b1110011)
                 .with_imm_i(Imm::new_u32(0b000000000001)),
+            Inst::Mret => code
+                .with_opcode(0b1110011)
+                .with_imm_i(Imm::new_u32(0b001100000010)),
+            Inst::Sret => code
+                .with_opcode(0b1110011)
+                .with_imm_i(Imm::new_u32(0b000100000010)),
+            Inst::Wfi => code
+                .with_opcode(0b1110011)
+                .with_imm_i(Imm::new_u32(0b000100000101)),
+            Inst::SfenceVma { addr, asid } => code
+                .with_opcode(0b1110011)
+                .with_rs1(*addr)
+                .with_rs2(*asid)
+                .with_funct7(0b0001001),
             Inst::Mul { dest, src1, src2 } => OP!(src1,src2,dest => code)
                 .with_funct3(0b000)
                 .with_funct7(0b0000001),
@@ -4296,6 +4399,44 @@ impl Inst {
 #[cfg(test)]
 mod tests {
     extern crate std;
+
+    /// Roundtrip the privileged SYSTEM instructions added for vane's
+    /// M2 (PLAN_LINUX_WASM.md §7.1): MRET/SRET/WFI/SFENCE.VMA.
+    #[test]
+    fn privileged_system_roundtrip() {
+        use crate::{Inst, IsCompressed, Reg, Xlen};
+        let cases: &[(u32, &str)] = &[
+            (0x30200073, "mret"),
+            (0x10200073, "sret"),
+            (0x10500073, "wfi"),
+            (0x00000073, "ecall"),
+            (0x00100073, "ebreak"),
+            // sfence.vma a0, a1 = funct7(0001001) rs2(a1) rs1(a0)
+            (0x12b50073, "sfence.vma a0, a1"),
+            // sfence.vma zero, zero — fence everything
+            (0x12000073, "sfence.vma zero, zero"),
+        ];
+        for &(word, text) in cases {
+            let (inst, compressed) = Inst::decode(word, Xlen::Rv64).unwrap();
+            assert_eq!(compressed, IsCompressed::No);
+            assert_eq!(std::format!("{inst}"), text, "display of {word:#x}");
+            assert_eq!(inst.encode_normal(Xlen::Rv64), word, "encode of {text}");
+        }
+        // SFENCE.VMA must tolerate a nonzero rs1 (the previous decoder
+        // rejected all SYSTEM/funct3=0 encodings with rs1 != 0).
+        let (inst, _) = Inst::decode(0x12b50073, Xlen::Rv64).unwrap();
+        assert_eq!(
+            inst,
+            Inst::SfenceVma {
+                addr: Reg(10),
+                asid: Reg(11)
+            }
+        );
+        // Garbage SYSTEM encodings still fail closed.
+        assert!(Inst::decode(0x7fe00073, Xlen::Rv64).is_err());
+        assert!(Inst::decode(0x302000f3, Xlen::Rv64).is_err()); // mret with rd != 0
+    }
+
     #[test]
     fn c_andi_imm_is_sign_extended() {
         // 0x9829 = c.andi s0, s0, -22 (imm[5] is a sign bit, not +42).

@@ -12,7 +12,7 @@ This crate currenly only supports RV32 instructions.
 RV64 instructions that are the same between versions will still be decoded successfully, but the user
 has to be careful around sign-extended immediates to preserve the correct value when extending them to 64 bits.
 
-RV64-specific instructions are not yet implemented, but will be in the future.
+RV64-specific base instructions (LD/LWU/SD, the *W arithmetic forms, and the RV64C compressed forms) are implemented; RV64-specific privileged instructions land as needed by the vane Linux boot plan (`../vane/PLAN_LINUX_WASM.md`).
 The immediates will also be switched to `u64` in the future to allow for easier usage of RV64.
 
 RV128 is currently not intended to be supported.
@@ -29,6 +29,7 @@ The decoder currently supports the following instructions:
 - [x] C standard extension
 - [x] Zihintpause standard extension
 - [x] Zicsr standard extension (Control and Status Register instructions)
+- [x] Privileged ISA core (MRET, SRET, WFI, SFENCE.VMA) and the privileged CSR enumeration (mstatus/sstatus family, menvcfg, PMP, mvendorid/mhartid, ...)
 - [x] F standard extension (Single-Precision Floating-Point)
 - [x] D standard extension (Double-Precision Floating-Point)
 
