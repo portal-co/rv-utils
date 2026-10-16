@@ -676,6 +676,8 @@ pub enum Inst {
     And { dest: Reg, src1: Reg, src2: Reg },
     /// Memory Fence
     Fence { fence: Fence },
+    /// Instruction-Fetch Fence (Zifencei)
+    FenceI,
 
     /// ECALL, call into environment
     Ecall,
@@ -749,6 +751,27 @@ pub enum Inst {
     },
     /// Atomic Memory Operation
     AmoW {
+        order: AmoOrdering,
+        op: AmoOp,
+        dest: Reg,
+        addr: Reg,
+        src: Reg,
+    },
+    /// Load-Reserved Doubleword (**RV64 only**)
+    LrD {
+        order: AmoOrdering,
+        dest: Reg,
+        addr: Reg,
+    },
+    /// Store-Conditional Doubleword (**RV64 only**)
+    ScD {
+        order: AmoOrdering,
+        dest: Reg,
+        addr: Reg,
+        src: Reg,
+    },
+    /// Atomic Memory Operation on a Doubleword (**RV64 only**)
+    AmoD {
         order: AmoOrdering,
         op: AmoOp,
         dest: Reg,
@@ -1411,6 +1434,7 @@ impl Display for Inst {
                 }
                 _ => write!(f, "fence {},{}", fence.pred, fence.succ),
             },
+            Inst::FenceI => write!(f, "fence.i"),
             Inst::Ecall => write!(f, "ecall"),
             Inst::Ebreak => write!(f, "ebreak"),
             Inst::Mret => write!(f, "mret"),
@@ -1431,12 +1455,19 @@ impl Display for Inst {
             Inst::Remu { dest, src1, src2 } => write!(f, "remu {dest}, {src1}, {src2}"),
             Inst::RemuW { dest, src1, src2 } => write!(f, "remuw {dest}, {src1}, {src2}"),
             Inst::LrW { order, dest, addr } => write!(f, "lr.w{order} {dest}, ({addr})",),
+            Inst::LrD { order, dest, addr } => write!(f, "lr.d{order} {dest}, ({addr})",),
             Inst::ScW {
                 order,
                 dest,
                 addr,
                 src,
             } => write!(f, "sc.w{order} {dest}, {src}, ({addr})"),
+            Inst::ScD {
+                order,
+                dest,
+                addr,
+                src,
+            } => write!(f, "sc.d{order} {dest}, {src}, ({addr})"),
             Inst::AmoW {
                 order,
                 op,
@@ -1444,6 +1475,13 @@ impl Display for Inst {
                 addr,
                 src,
             } => write!(f, "amo{op}.w{order} {dest}, {src}, ({addr})",),
+            Inst::AmoD {
+                order,
+                op,
+                dest,
+                addr,
+                src,
+            } => write!(f, "amo{op}.d{order} {dest}, {src}, ({addr})"),
             
             // Zicsr instructions
             Inst::Csrrw { csr, dest, src } => write!(f, "csrrw {dest}, {csr}, {src}"),
@@ -2921,6 +2959,8 @@ impl Inst {
                             src: code.rs1(),
                         },
                     },
+                    // FENCE.I (Zifencei)
+                    0b001 => Inst::FenceI,
                     _ => return Err(decode_error(code, "MISC-MEM funct3")),
                 }
             }
@@ -2997,10 +3037,12 @@ impl Inst {
             }
             // AMO
             0b00101111 => {
-                // width must be W
-                if code.funct3() != 0b010 {
-                    return Err(decode_error(code, "AMO width funct3"));
-                }
+                // width: W (funct3=010) always; D (funct3=011) on RV64
+                let dword = match code.funct3() {
+                    0b010 => false,
+                    0b011 if xlen.is_64() => true,
+                    _ => return Err(decode_error(code, "AMO width funct3")),
+                };
 
                 let kind = code.extract(27..=31);
                 let aq = code.extract(26..=26) == 1;
@@ -3015,19 +3057,38 @@ impl Inst {
                             return Err(decode_error(code, "AMO.LR rs2"));
                         }
 
-                        Inst::LrW {
-                            order,
-                            dest: code.rd(),
-                            addr: code.rs1(),
+                        if dword {
+                            Inst::LrD {
+                                order,
+                                dest: code.rd(),
+                                addr: code.rs1(),
+                            }
+                        } else {
+                            Inst::LrW {
+                                order,
+                                dest: code.rd(),
+                                addr: code.rs1(),
+                            }
                         }
                     }
                     // SC
-                    0b00011 => Inst::ScW {
-                        order,
-                        dest: code.rd(),
-                        addr: code.rs1(),
-                        src: code.rs2(),
-                    },
+                    0b00011 => {
+                        if dword {
+                            Inst::ScD {
+                                order,
+                                dest: code.rd(),
+                                addr: code.rs1(),
+                                src: code.rs2(),
+                            }
+                        } else {
+                            Inst::ScW {
+                                order,
+                                dest: code.rd(),
+                                addr: code.rs1(),
+                                src: code.rs2(),
+                            }
+                        }
+                    }
                     _ => {
                         let op = match kind {
                             0b00001 => AmoOp::Swap,
@@ -3041,12 +3102,22 @@ impl Inst {
                             0b11100 => AmoOp::Maxu,
                             _ => return Err(decode_error(code, "AMO op funct7")),
                         };
-                        Inst::AmoW {
-                            order,
-                            op,
-                            dest: code.rd(),
-                            addr: code.rs1(),
-                            src: code.rs2(),
+                        if dword {
+                            Inst::AmoD {
+                                order,
+                                op,
+                                dest: code.rd(),
+                                addr: code.rs1(),
+                                src: code.rs2(),
+                            }
+                        } else {
+                            Inst::AmoW {
+                                order,
+                                op,
+                                dest: code.rd(),
+                                addr: code.rs1(),
+                                src: code.rs2(),
+                            }
                         }
                     }
                 }
@@ -3880,6 +3951,7 @@ impl Inst {
                     v
                 }
             },
+            Inst::FenceI => code.with_opcode(0b0001111).with_funct3(0b001),
             Inst::Ecall => code
                 .with_opcode(0b1110011)
                 .with_imm_i(Imm::new_u32(0b000000000000)),
@@ -3991,7 +4063,59 @@ impl Inst {
                     },
                 ),
             },
-            
+            Inst::LrD { order, dest, addr } => match code
+                .with_opcode(0b00101111)
+                .with_funct3(0b011)
+                .insert(26..=26, if order.aq_rl().0 { 1 } else { 0 })
+                .insert(25..=25, if order.aq_rl().1 { 1 } else { 0 })
+            {
+                code => code.insert(27..=31, 0b00010).with_rd(*dest).with_rs1(*addr),
+            },
+            Inst::ScD {
+                order,
+                dest,
+                addr,
+                src,
+            } => match code
+                .with_opcode(0b00101111)
+                .with_funct3(0b011)
+                .insert(26..=26, if order.aq_rl().0 { 1 } else { 0 })
+                .insert(25..=25, if order.aq_rl().1 { 1 } else { 0 })
+            {
+                code => code
+                    .insert(27..=31, 0b00011)
+                    .with_rd(*dest)
+                    .with_rs1(*addr)
+                    .with_rs2(*src),
+            },
+            Inst::AmoD {
+                order,
+                op,
+                dest,
+                addr,
+                src,
+            } => match code
+                .with_opcode(0b00101111)
+                .with_funct3(0b011)
+                .insert(26..=26, if order.aq_rl().0 { 1 } else { 0 })
+                .insert(25..=25, if order.aq_rl().1 { 1 } else { 0 })
+            {
+                code => code.with_rd(*dest).with_rs1(*addr).with_rs2(*src).insert(
+                    27..=31,
+                    match op {
+                        AmoOp::Swap => 0b00001,
+                        AmoOp::Add => 0b00000,
+                        AmoOp::Xor => 0b00100,
+                        AmoOp::And => 0b01100,
+                        AmoOp::Or => 0b01000,
+                        AmoOp::Min => 0b10000,
+                        AmoOp::Max => 0b10100,
+                        AmoOp::Minu => 0b11000,
+                        AmoOp::Maxu => 0b11100,
+                    },
+                ),
+            },
+
             // Zicsr instructions
             Inst::Csrrw { csr, dest, src } => code
                 .with_opcode(0b1110011)
@@ -4519,6 +4643,17 @@ mod tests {
         assert!(Inst::decode(0x302000f3, Xlen::Rv64).is_err()); // mret with rd != 0
     }
 
+    /// fence.i (Zifencei) roundtrip.
+    #[test]
+    fn fence_i_roundtrip() {
+        use crate::{Inst, IsCompressed, Xlen};
+        let (i, c) = Inst::decode(0x0000100f, Xlen::Rv64).unwrap();
+        assert_eq!(i, Inst::FenceI);
+        assert_eq!(c, IsCompressed::No);
+        assert_eq!(i.encode_normal(Xlen::Rv64), 0x0000100f);
+        assert_eq!(std::format!("{i}"), "fence.i");
+    }
+
     /// RV64C audit additions (M2 follow-up, PLAN_LINUX_WASM.md §7.1):
     /// C.LD/C.SD/C.FLD/C.FSD/C.FLDSP/C.FSDSP/C.ADDIW plus the corrected
     /// C.LDSP/C.SDSP offset layouts (verified against riscv-unified-db).
@@ -4753,6 +4888,7 @@ mod tests {
             } => true,
             // All other fences are reserved
             Inst::Fence { .. } => false,
+            Inst::FenceI => true,
             _ => true,
         }
     }
